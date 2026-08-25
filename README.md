@@ -103,7 +103,7 @@ On first boot, the system automatically initializes the root administrator:
 
 1. **Modular AI Pipeline (Section 8):** Face detection, landmark alignment, anti-spoofing liveness check, vector embedding generation, and cosine similarity threshold matching.
 2. **Kiosk Screen Specifications (Section 7):** Standby mode, Green Success confirmation, Blue "Already Marked" feedback, and Red "Face Not Recognized" warning.
-3. **Attendance Rules (Section 10):** First scan records entry time and flags `Late` if after 09:30 AM; subsequent scans on the same day prevent duplicate records.
+3. **Attendance Rules (Section 10):** First scan records entry time and flags `Late` if after 10.00 AM; subsequent scans on the same day prevent duplicate records.
 4. **Multi-Angle Face Enrollment (Section 9.2):** Guided captures (Front, Slight Left, Slight Right, Neutral) with explicit DPDP Act 2023 consent checkbox.
 5. **Admin Dashboard & Audit Trail (Section 12 & 16.4):** Real-time headcount cards (Total, Present, Late, Absent, Leave), live attendance table, manual corrections modal, and immutable audit logs.
 6. **Reports & Exports (Section 14):** One-click Daily attendance CSV download and 7-day attendance compliance rate analytics.
