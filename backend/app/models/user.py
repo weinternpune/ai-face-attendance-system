@@ -1,0 +1,53 @@
+from pydantic import BaseModel, Field
+from typing import List, Optional, Any
+from datetime import datetime
+from enum import Enum
+
+class UserRole(str, Enum):
+    ADMIN = "Admin"
+    HR = "HR"
+    EMPLOYEE = "Employee"
+    INTERN = "Intern"
+
+class EmployeeType(str, Enum):
+    FULL_TIME = "Full-Time"
+    INTERN = "Intern"
+    CONTRACT = "Contract"
+
+class UserStatus(str, Enum):
+    ACTIVE = "Active"
+    DISABLED = "Disabled"
+
+class UserBase(BaseModel):
+    name: str
+    employee_id: str
+    email: str
+    phone: Optional[str] = None
+    role: UserRole = UserRole.INTERN
+    department: str
+    designation: Optional[str] = None
+    employee_type: EmployeeType = EmployeeType.INTERN
+    joining_date: Optional[str] = None
+    status: UserStatus = UserStatus.ACTIVE
+
+class UserCreate(UserBase):
+    password: Optional[str] = None  # Needed for Admin/HR login, optional for scan-only employees
+
+class FaceEnrollmentRequest(BaseModel):
+    user_id: str
+    face_images: List[str]  # Base64 encoded images (Front, Left, Right, Neutral)
+    consent_given: bool = True
+    consent_timestamp: Optional[str] = None
+
+class UserResponse(UserBase):
+    id: str
+    has_face_enrolled: bool = False
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+class UserInDB(UserBase):
+    hashed_password: Optional[str] = None
+    face_embeddings: List[List[float]] = []  # List of multi-angle vector embeddings
+    consent_record: Optional[dict] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: Optional[datetime] = None
