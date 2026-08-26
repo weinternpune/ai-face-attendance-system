@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import apiClient from '../api/client';
 import CustomSelect from '../components/CustomSelect';
 import { 
@@ -12,8 +13,13 @@ import {
   RefreshCw, 
   Edit3, 
   Activity, 
-  Sparkles,
-  X 
+  Sparkles, 
+  X, 
+  Wifi, 
+  WifiOff, 
+  Calendar, 
+  Layers, 
+  ArrowRight 
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -32,6 +38,9 @@ export default function Dashboard() {
   const [correctionStatus, setCorrectionStatus] = useState('Present');
   const [correctionReason, setCorrectionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [lastLiveEvent, setLastLiveEvent] = useState(null);
+  const wsRef = useRef(null);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -49,30 +58,74 @@ export default function Dashboard() {
     }
   };
 
+  // Real-Time WebSocket Connection
   useEffect(() => {
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 15000);
-    return () => clearInterval(interval);
+
+    // Determine WS URL
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    const baseUrl = apiUrl.replace(/^http/, 'ws').replace(/\/api\/?$/, '');
+    const wsUrl = `${baseUrl}/ws/attendance`;
+
+    let socket;
+    try {
+      socket = new WebSocket(wsUrl);
+      wsRef.current = socket;
+
+      socket.onopen = () => {
+        setWsConnected(true);
+        console.log('Real-time attendance WebSocket connected');
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          setLastLiveEvent(payload);
+          // Auto-refresh stats and records immediately
+          fetchDashboardData();
+        } catch (e) {
+          console.warn('Failed to parse WS message:', e);
+        }
+      };
+
+      socket.onclose = () => {
+        setWsConnected(false);
+      };
+
+      socket.onerror = (err) => {
+        console.warn('WebSocket connection error:', err);
+        setWsConnected(false);
+      };
+    } catch (err) {
+      console.warn('WebSocket init failed:', err);
+    }
+
+    return () => {
+      if (socket) socket.close();
+    };
   }, []);
 
   const handleExportCSV = async () => {
     try {
-      const response = await apiClient.get('/reports/daily-csv', { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const today = new Date().toISOString().split('T')[0];
+      const res = await apiClient.get(`/reports/daily-csv?date=${today}`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `weintern_attendance_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `weintern_attendance_${today}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (err) {
-      console.error('CSV Export failed:', err);
+      console.error('CSV export failed:', err);
     }
   };
 
   const handleOpenCorrection = (record) => {
     setSelectedRecord(record);
-    setCorrectionStatus(record.status);
+    setCorrectionStatus(record.status || 'Present');
     setCorrectionReason('');
     setCorrectionModalOpen(true);
   };
@@ -84,239 +137,290 @@ export default function Dashboard() {
     try {
       await apiClient.patch(`/attendance/${selectedRecord.id}/correct`, {
         status: correctionStatus,
-        reason: correctionReason || 'Admin manual override'
+        reason: correctionReason
       });
       setCorrectionModalOpen(false);
       fetchDashboardData();
     } catch (err) {
-      console.error('Correction failed:', err);
+      alert(err.response?.data?.detail || 'Failed to update attendance record');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const filteredRecords = attendanceRecords.filter((r) =>
-    r.employee_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.department.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredRecords = attendanceRecords.filter((r) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      r.employee_name?.toLowerCase().includes(q) ||
+      r.employee_id?.toLowerCase().includes(q) ||
+      r.department?.toLowerCase().includes(q)
+    );
+  });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8 animate-fadeIn">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-10 space-y-5 sm:space-y-8 animate-fadeIn font-sans">
       
-      {/* Top Header & Quick Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 glass-panel rounded-3xl p-6 border border-slate-800 shadow-xl">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel p-5 sm:p-7 rounded-3xl border border-slate-800 shadow-xl">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-400">Live Workspace Monitoring</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-extrabold bg-amber-400/10 text-amber-400 border border-amber-400/20">
+              Live Workforce
+            </span>
+            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+              {wsConnected ? (
+                <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  Live Sync Connected
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-slate-500">
+                  <WifiOff className="w-3.5 h-3.5" /> Polling Mode
+                </span>
+              )}
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">Executive Attendance Dashboard</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1">Real-Time Attendance Operations</h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-            Biometric activity for {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            Monitor real-time biometric kiosk verification, employee shift statuses, and live headcount statistics
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={fetchDashboardData}
-            className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-slate-300 hover:text-white hover:border-amber-400/40 transition hover:scale-105"
-            title="Refresh Live Data"
+            title="Refresh Table"
+            className="p-2.5 sm:p-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-2xl border border-slate-800 transition cursor-pointer shrink-0"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-400' : ''}`} />
           </button>
 
           <button
             onClick={handleExportCSV}
-            className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-300 hover:from-amber-400 hover:to-yellow-200 text-slate-950 font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-amber-500/25 transition hover:scale-[1.02] active:scale-95"
+            className="btn-primary flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl cursor-pointer"
           >
             <Download className="w-4 h-4 stroke-[2.5]" /> Export Daily CSV
           </button>
         </div>
       </div>
 
-      {/* 12.1 Premium Metric KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-5">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 animate-fade-slide-up">
         
         {/* Total Staff */}
-        <div className="glass-panel glass-panel-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Staff</span>
-            <div className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Total Staff</span>
+            <div className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300 group-hover:scale-110 transition">
               <Users className="w-4 h-4" />
             </div>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-white mt-3 tracking-tight">{stats.total_employees}</div>
-          <div className="text-[11px] text-slate-400 mt-1 font-medium">Registered Personnel</div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-slate-800/20 rounded-full blur-xl pointer-events-none" />
+          <div className="text-[11px] text-slate-400 mt-1 font-medium flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Registered Personnel
+          </div>
         </div>
 
         {/* Present */}
-        <div className="glass-panel glass-panel-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-emerald-500/20">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-emerald-500/20 group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-400">Present</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-400">Present</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition shadow-sm">
               <UserCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-emerald-400 mt-3 tracking-tight">{stats.present}</div>
-          <div className="text-[11px] text-emerald-400/80 mt-1 font-medium">Verified at Kiosk</div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-emerald-500/15 rounded-full blur-xl pointer-events-none" />
+          <div className="text-[11px] text-emerald-400/90 mt-1 font-medium flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> Verified at Kiosk
+          </div>
         </div>
 
         {/* Late */}
-        <div className="glass-panel glass-panel-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-amber-500/20">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-amber-500/20 group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">Late Arrivals</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">Late Arrivals</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition shadow-sm">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-amber-400 mt-3 tracking-tight">{stats.late}</div>
-          <div className="text-[11px] text-amber-400/80 mt-1 font-medium">After 10:00 AM</div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-amber-500/15 rounded-full blur-xl pointer-events-none" />
+          <div className="text-[11px] text-amber-400/90 mt-1 font-medium flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> After Shift Grace
+          </div>
         </div>
 
         {/* Absent */}
-        <div className="glass-panel glass-panel-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-rose-500/20">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-rose-500/20 group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-rose-400">Absent</span>
-            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-rose-400">Absent</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:scale-110 transition shadow-sm">
               <UserX className="w-4 h-4" />
             </div>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-rose-400 mt-3 tracking-tight">{stats.absent}</div>
-          <div className="text-[11px] text-rose-400/80 mt-1 font-medium">Not checked in</div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-rose-500/15 rounded-full blur-xl pointer-events-none" />
+          <div className="text-[11px] text-rose-400/90 mt-1 font-medium flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Not Checked In
+          </div>
         </div>
 
         {/* On Leave */}
-        <div className="glass-panel glass-panel-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-cyan-500/20 col-span-2 sm:col-span-1">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-cyan-500/20 col-span-2 sm:col-span-1 group">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">On Leave</span>
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+            <span className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-400">On Leave</span>
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition shadow-sm">
               <CalendarOff className="w-4 h-4" />
             </div>
           </div>
           <div className="text-3xl sm:text-4xl font-black text-cyan-400 mt-3 tracking-tight">{stats.on_leave}</div>
-          <div className="text-[11px] text-cyan-400/80 mt-1 font-medium">Approved Leaves</div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-cyan-500/15 rounded-full blur-xl pointer-events-none" />
+          <div className="text-[11px] text-cyan-400/90 mt-1 font-medium flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> Approved Leaves
+          </div>
         </div>
 
       </div>
 
-      {/* 12.2 Live Attendance Stream Table */}
-      <div className="glass-panel rounded-3xl p-4 sm:p-8 border border-slate-800 shadow-2xl space-y-6">
-        
-        {/* Table Search & Title Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+      {/* Quick Access Modules Banner */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Link 
+          to="/leaves" 
+          className="glass-panel card-hover p-5 rounded-2xl border border-slate-800 transition flex items-center justify-between group cursor-pointer"
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-              <Activity className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center border border-amber-400/20 group-hover:scale-110 transition">
+              <Calendar className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-black text-white">Live Attendance Stream</h2>
-              <p className="text-xs text-slate-400">Real-time camera verification activity log</p>
+              <p className="font-bold text-white text-sm group-hover:text-amber-400 transition">Leave & Regularization Center</p>
+              <p className="text-slate-400 text-xs">Review pending time-off requests and regularizations</p>
             </div>
           </div>
+          <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1.5 transition" />
+        </Link>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search staff, ID, dept..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-2xl text-xs text-white placeholder-slate-500 focus:border-amber-400 focus:outline-none transition shadow-inner"
-              />
+        <Link 
+          to="/shifts" 
+          className="glass-panel card-hover p-5 rounded-2xl border border-slate-800 transition flex items-center justify-between group cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-400/10 text-cyan-400 flex items-center justify-center border border-cyan-400/20 group-hover:scale-110 transition">
+              <Layers className="w-5 h-5" />
             </div>
+            <div>
+              <p className="font-bold text-white text-sm group-hover:text-cyan-400 transition">Shift & Timing Rules</p>
+              <p className="text-slate-400 text-xs">Configure shifts, grace periods, and late thresholds</p>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-cyan-400 group-hover:translate-x-1.5 transition" />
+        </Link>
+      </div>
+
+      {/* Live Attendance Table */}
+      <div className="glass-panel rounded-3xl border border-slate-800 shadow-xl overflow-hidden animate-fade-slide-up">
+        
+        {/* Table Search & Filter Bar */}
+        <div className="p-4 sm:p-6 border-b border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-amber-400" /> Today's Live Attendance Stream
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Real-time biometrics stream from Entrance Kiosks</p>
+          </div>
+
+          <div className="relative w-full sm:w-80">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search live punches by name or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950/80 border border-slate-800 rounded-2xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 shadow-inner"
+            />
           </div>
         </div>
 
-        {/* Table Rows */}
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="w-full text-left text-xs sm:text-sm text-slate-300 min-w-[700px]">
-            <thead className="bg-slate-950/80 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+        {/* Table Body */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs sm:text-sm min-w-[700px]">
+            <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-bold uppercase tracking-wider text-[10px] sm:text-[11px]">
               <tr>
-                <th className="px-6 py-4">Employee</th>
-                <th className="px-6 py-4">ID</th>
-                <th className="px-6 py-4">Department</th>
-                <th className="px-6 py-4">Entry Time</th>
-                <th className="px-6 py-4">AI Match</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="px-5 py-4">Employee</th>
+                <th className="px-5 py-4">Department</th>
+                <th className="px-5 py-4">In Time</th>
+                <th className="px-5 py-4">Out Time</th>
+                <th className="px-5 py-4">AI Confidence</th>
+                <th className="px-5 py-4">Shift Status</th>
+                <th className="px-5 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 font-medium">
-              {filteredRecords.length === 0 ? (
+            <tbody className="divide-y divide-slate-800/60">
+              {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-16 text-center text-slate-400 text-sm">
-                    <div className="w-12 h-12 rounded-full bg-slate-800/60 flex items-center justify-center mx-auto mb-3 text-slate-400">
-                      <Clock className="w-6 h-6" />
-                    </div>
-                    No attendance records logged for today yet.
+                  <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
+                    <div className="inline-block animate-spin w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full mb-2" />
+                    <p className="font-medium">Connecting to live attendance stream...</p>
+                  </td>
+                </tr>
+              ) : filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-5 py-12 text-center text-slate-400">
+                    <Activity className="w-10 h-10 mx-auto text-slate-600 mb-2" />
+                    <p className="font-semibold text-slate-300">No attendance scans recorded today yet</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Scans made at the Kiosk will appear here in real-time.</p>
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((record) => {
-                  const initials = record.employee_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-                  return (
-                    <tr key={record.id} className="hover:bg-slate-850/60 transition group">
-                      <td className="px-6 py-4 font-semibold text-white flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500/20 to-amber-300/10 border border-amber-400/30 flex items-center justify-center text-xs font-bold text-amber-400 shrink-0">
-                          {initials}
+                filteredRecords.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-900/40 transition">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-amber-400/10 text-amber-400 font-bold flex items-center justify-center border border-amber-400/20">
+                          {r.employee_name?.charAt(0) || 'E'}
                         </div>
                         <div>
-                          <div>{record.employee_name}</div>
-                          {record.is_manual && (
-                            <span className="text-[10px] text-amber-400 font-normal">
-                              Manual Override
-                            </span>
-                          )}
+                          <p className="font-bold text-white">{r.employee_name}</p>
+                          <p className="text-[11px] text-slate-400 font-mono">{r.employee_id}</p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-xs text-slate-400">{record.employee_id}</td>
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-300">
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-950/60 border border-slate-800">
-                          {record.department}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-slate-300 font-medium">{r.department}</td>
+                    <td className="px-5 py-4 font-mono text-white font-bold">{r.entry_time}</td>
+                    <td className="px-5 py-4 font-mono text-slate-400">{r.exit_time}</td>
+                    <td className="px-5 py-4">
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-900 border border-slate-800 text-slate-300">
+                        {r.confidence ? `${r.confidence}%` : 'Manual'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      {r.status === 'Present' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-400/10 text-emerald-400 border border-emerald-400/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> Present
                         </span>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-xs text-emerald-400 font-bold">{record.entry_time}</td>
-                      <td className="px-6 py-4 text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-amber-400 to-emerald-400 rounded-full"
-                              style={{ width: `${Math.min(100, record.confidence)}%` }}
-                            />
-                          </div>
-                          <span className="text-[11px] font-mono text-slate-400">{record.confidence}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                          record.status === 'Present'
-                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                            : record.status === 'Late'
-                            ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
-                            : 'bg-slate-800 text-slate-300'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${record.status === 'Present' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                          {record.status}
+                      )}
+                      {r.status === 'Late' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/30">
+                          <Clock className="w-3 h-3 text-amber-400" /> Late
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleOpenCorrection(record)}
-                          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-transparent hover:border-slate-700 transition"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" /> Edit
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
+                      )}
+                      {r.status === 'Leave' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-400/10 text-cyan-400 border border-cyan-400/30">
+                          <CalendarOff className="w-3 h-3 text-cyan-400" /> On Leave
+                        </span>
+                      )}
+                      {r.is_manual && (
+                        <span className="ml-1 text-[10px] text-amber-400/80 italic font-mono font-bold">(Edited)</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button
+                        onClick={() => handleOpenCorrection(r)}
+                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-xl transition border border-slate-800 cursor-pointer"
+                      >
+                        Override
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -325,59 +429,61 @@ export default function Dashboard() {
 
       {/* Manual Correction Modal */}
       {correctionModalOpen && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fadeIn">
-          <div className="glass-panel border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 animate-scale-up">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 w-full max-w-md rounded-3xl border border-slate-800 p-5 sm:p-7 space-y-4 shadow-2xl animate-spring-in my-auto max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-lg font-bold text-white">Manual Attendance Correction</h3>
-              <button onClick={() => setCorrectionModalOpen(false)} className="text-slate-400 hover:text-white p-1">
+              <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <Edit3 className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" /> Manual Attendance Override
+              </h3>
+              <button onClick={() => setCorrectionModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="text-xs text-slate-300 space-y-1 bg-slate-950/60 p-3 rounded-2xl border border-slate-800">
-              <div>Employee: <strong className="text-white">{selectedRecord.employee_name}</strong> ({selectedRecord.employee_id})</div>
-              <div>Current Entry Time: <strong className="text-emerald-400 font-mono">{selectedRecord.entry_time}</strong></div>
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-1">
+              <p className="text-slate-400">Employee: <strong className="text-white">{selectedRecord.employee_name} ({selectedRecord.employee_id})</strong></p>
+              <p className="text-slate-400">Recorded In Time: <span className="text-amber-400 font-mono font-bold">{selectedRecord.entry_time}</span></p>
             </div>
 
-            <form onSubmit={submitCorrection} className="space-y-4">
+            <form onSubmit={submitCorrection} className="space-y-4 text-xs">
               <CustomSelect
-                label="Update Status"
+                label="Status Override *"
                 value={correctionStatus}
                 onChange={(val) => setCorrectionStatus(val)}
                 options={[
-                  { label: 'Present (On-Time)', value: 'Present' },
-                  { label: 'Late Arrival', value: 'Late' },
-                  { label: 'Absent', value: 'Absent' },
-                  { label: 'Approved Leave', value: 'Leave' },
+                  { label: 'Present', value: 'Present', desc: 'Clocked in on time' },
+                  { label: 'Late', value: 'Late', desc: 'Clocked in after shift grace period' },
+                  { label: 'Leave', value: 'Leave', desc: 'Approved casual or medical leave' },
+                  { label: 'Absent', value: 'Absent', desc: 'Not present in office' }
                 ]}
               />
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Reason for Correction (Audit Logged)</label>
+                <label className="block text-slate-300 font-semibold mb-1.5">Correction Reason (Logged to Audit Trail) *</label>
                 <textarea
-                  required
                   rows="3"
-                  placeholder="e.g. Official outdoor duty / biometric exception"
+                  required
+                  placeholder="e.g. Device offline, verified in-person with Manager approval"
                   value={correctionReason}
                   onChange={(e) => setCorrectionReason(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:border-amber-400 focus:outline-none placeholder-slate-500"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white focus:outline-none focus:border-amber-400 shadow-inner"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setCorrectionModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700 transition"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 text-xs font-bold rounded-xl shadow-lg shadow-amber-500/20 hover:scale-105 transition"
+                  className="btn-primary px-5 py-2 rounded-xl font-bold cursor-pointer"
                 >
-                  {actionLoading ? 'Saving...' : 'Save & Log Correction'}
+                  {actionLoading ? 'Saving...' : 'Save Override'}
                 </button>
               </div>
             </form>

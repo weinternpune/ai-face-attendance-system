@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     DEFAULT_ADMIN_PASSWORD: str = "admin@weintern123"
     DEFAULT_ADMIN_NAME: str = "System Administrator"
     
-    RECOGNITION_THRESHOLD: float = 0.85
-    REVIEW_THRESHOLD: float = 0.70
+    RECOGNITION_THRESHOLD: float = 0.68
+    REVIEW_THRESHOLD: float = 0.50
     OFFICE_START_TIME: str = "10:00"
 
     class Config:

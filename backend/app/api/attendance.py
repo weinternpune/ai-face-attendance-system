@@ -7,6 +7,7 @@ from app.models.attendance import AttendanceVerifyRequest, AttendanceCorrectionR
 from app.services.ai_service import ai_service
 from app.services.matching_service import matching_service
 from app.services.attendance_service import attendance_service
+from app.core.websocket import ws_manager
 from app.api.auth import get_current_admin
 
 router = APIRouter(prefix="/attendance", tags=["Attendance System"])
@@ -19,19 +20,14 @@ async def verify_kiosk_face(payload: AttendanceVerifyRequest):
     marks attendance or handles duplicate / unrecognized states according to PRD.
     """
     db = get_database()
-    print(f"[*] Received Kiosk frame from device {payload.device_id}, length: {len(payload.image_base64)}")
     
     # 1. Decode frame
     image = ai_service.decode_base64_image(payload.image_base64)
     if image is None:
-        print("[!] Failed to decode base64 image")
         raise HTTPException(status_code=400, detail="Invalid image data")
-
-    print(f"[*] Frame shape: {image.shape}")
 
     # 2. Face Detection & Liveness Check
     face_detected, is_live, cropped_face, meta = ai_service.detect_face_and_liveness(image)
-    print(f"[*] Detection result: face_detected={face_detected}, is_live={is_live}, meta={meta}")
     
     if not face_detected:
         return {
@@ -40,11 +36,23 @@ async def verify_kiosk_face(payload: AttendanceVerifyRequest):
         }
 
     if not is_live:
-        # Anti-spoofing alert
+        # Anti-spoofing alert & Notification
         await db.audit_logs.insert_one({
             "action": "SPOOF_ATTEMPT_BLOCKED",
             "details": {"device_id": payload.device_id, "meta": meta},
             "timestamp": datetime.utcnow()
+        })
+        await db.notifications.insert_one({
+            "title": "🚨 Spoof Attempt Blocked",
+            "message": f"Photo or screen presentation detected on {payload.device_id}.",
+            "type": "ALERT",
+            "category": "SECURITY",
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        })
+        await ws_manager.broadcast({
+            "event": "SECURITY_ALERT",
+            "data": {"title": "Spoof Attempt Blocked", "device_id": payload.device_id}
         })
         return {
             "status_code": "SPOOF_DETECTED",
@@ -72,7 +80,6 @@ async def verify_kiosk_face(payload: AttendanceVerifyRequest):
         matched_user, confidence, action = matching_service.find_best_match(query_emb, registered_users)
 
     if action != "ACCEPT" or not matched_user:
-        # Log unrecognized face event in Audit Logs (PRD Section 6.3 & Section 11)
         await db.audit_logs.insert_one({
             "action": "UNKNOWN_FACE_DETECTED",
             "details": {
@@ -81,6 +88,10 @@ async def verify_kiosk_face(payload: AttendanceVerifyRequest):
                 "reason": "Face not enrolled or match confidence below threshold"
             },
             "timestamp": datetime.utcnow()
+        })
+        await ws_manager.broadcast({
+            "event": "UNKNOWN_FACE",
+            "data": {"device_id": payload.device_id, "confidence": round(confidence * 100, 2)}
         })
         return {
             "status_code": "UNKNOWN_FACE",
@@ -94,7 +105,7 @@ async def verify_kiosk_face(payload: AttendanceVerifyRequest):
 
 @router.get("/today-stats", response_model=TodayStats)
 async def get_today_stats(current_admin: dict = Depends(get_current_admin)):
-    """Summary overview for Admin Dashboard (Section 12.1)"""
+    """Summary overview for Admin Dashboard"""
     db = get_database()
     today_date, _ = attendance_service.get_current_date_and_time()
 
@@ -102,9 +113,16 @@ async def get_today_stats(current_admin: dict = Depends(get_current_admin)):
     
     today_records = await db.attendance.find({"date": today_date}).to_list(length=1000)
     
+    # Also check approved leaves covering today
+    approved_leaves_count = await db.leaves.count_documents({
+        "status": "Approved",
+        "start_date": {"$lte": today_date},
+        "end_date": {"$gte": today_date}
+    })
+
     present_count = sum(1 for r in today_records if r.get("status") in ["Present", "Late"])
     late_count = sum(1 for r in today_records if r.get("status") == "Late")
-    leave_count = sum(1 for r in today_records if r.get("status") == "Leave")
+    leave_count = sum(1 for r in today_records if r.get("status") == "Leave") + approved_leaves_count
     absent_count = max(0, total_employees - (present_count + leave_count))
 
     return TodayStats(
@@ -117,7 +135,7 @@ async def get_today_stats(current_admin: dict = Depends(get_current_admin)):
 
 @router.get("/today")
 async def get_today_attendance(current_admin: dict = Depends(get_current_admin)):
-    """Today's Live Attendance Table (Section 12.2)"""
+    """Today's Live Attendance Table"""
     db = get_database()
     today_date, _ = attendance_service.get_current_date_and_time()
 
@@ -144,7 +162,7 @@ async def manual_correct_attendance(
     payload: AttendanceCorrectionRequest, 
     current_admin: dict = Depends(get_current_admin)
 ):
-    """Admin manual attendance correction with full audit logging (Section 12.3 & 16.4)"""
+    """Admin manual attendance correction with full audit logging"""
     db = get_database()
     try:
         att_obj_id = ObjectId(attendance_id)
@@ -167,9 +185,11 @@ async def manual_correct_attendance(
     await db.attendance.update_one({"_id": att_obj_id}, {"$set": update_data})
 
     # Log to Audit Trail
+    admin_id = str(current_admin.get("_id") or current_admin.get("id") or "SYSTEM")
+    admin_name = current_admin.get("name", "Administrator")
     await db.audit_logs.insert_one({
-        "admin_id": str(current_admin["_id"]),
-        "admin_name": current_admin.get("name"),
+        "admin_id": admin_id,
+        "admin_name": admin_name,
         "action": "MANUAL_ATTENDANCE_CORRECTION",
         "target_user_id": record.get("user_id"),
         "target_user_name": record.get("employee_name"),
@@ -180,6 +200,16 @@ async def manual_correct_attendance(
             "reason": payload.reason
         },
         "timestamp": datetime.utcnow()
+    })
+
+    # Broadcast correction update
+    await ws_manager.broadcast({
+        "event": "ATTENDANCE_CORRECTED",
+        "data": {
+            "attendance_id": attendance_id,
+            "status": payload.status.value,
+            "entry_time": payload.entry_time or record.get("entry_time")
+        }
     })
 
     return {"message": "Attendance record updated successfully with audit trail."}

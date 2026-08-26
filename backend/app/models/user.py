@@ -28,10 +28,11 @@ class UserBase(BaseModel):
     designation: Optional[str] = None
     employee_type: EmployeeType = EmployeeType.INTERN
     joining_date: Optional[str] = None
+    shift_name: Optional[str] = "General Shift"
     status: UserStatus = UserStatus.ACTIVE
 
 class UserCreate(UserBase):
-    password: Optional[str] = None  # Needed for Admin/HR login, optional for scan-only employees
+    password: Optional[str] = None
 
 class FaceEnrollmentRequest(BaseModel):
     user_id: str
@@ -47,7 +48,7 @@ class UserResponse(UserBase):
 
 class UserInDB(UserBase):
     hashed_password: Optional[str] = None
-    face_embeddings: List[List[float]] = []  # List of multi-angle vector embeddings
+    face_embeddings: List[List[float]] = []
     consent_record: Optional[dict] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None

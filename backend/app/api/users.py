@@ -1,20 +1,33 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from bson import ObjectId
 from datetime import datetime
+from pydantic import BaseModel
 from app.database import get_database
 from app.models.user import UserCreate, UserResponse, FaceEnrollmentRequest, UserStatus
 from app.core.security import get_password_hash
 from app.api.auth import get_current_admin
 from app.services.ai_service import ai_service
+from app.core.websocket import ws_manager
 
 router = APIRouter(prefix="/users", tags=["Users & Employees"])
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role: Optional[str] = None
+    department: Optional[str] = None
+    designation: Optional[str] = None
+    employee_type: Optional[str] = None
+    shift_name: Optional[str] = None
+    status: Optional[str] = None
+
+@router.post("", response_model=dict)
 @router.post("/", response_model=dict)
 async def create_employee(user_in: UserCreate, current_admin: dict = Depends(get_current_admin)):
     db = get_database()
     
-    # Check if email or employee_id already exists
     existing_email = await db.users.find_one({"email": user_in.email.lower()})
     if existing_email:
         raise HTTPException(status_code=400, detail="User with this email already exists")
@@ -24,42 +37,47 @@ async def create_employee(user_in: UserCreate, current_admin: dict = Depends(get
         raise HTTPException(status_code=400, detail="Employee ID already exists")
 
     doc = user_in.model_dump()
-    doc["email"] = doc["email"].lower()
-    doc["employee_id"] = doc["employee_id"].upper()
+    doc["email"] = doc["email"].lower().strip()
+    doc["employee_id"] = doc["employee_id"].upper().strip()
     doc["created_at"] = datetime.utcnow()
     doc["face_embeddings"] = []
     
-    if user_in.password:
-        doc["hashed_password"] = get_password_hash(user_in.password)
-        del doc["password"]
+    if user_in.password and len(user_in.password.strip()) > 0:
+        doc["hashed_password"] = get_password_hash(user_in.password.strip())
+        doc.pop("password", None)
     else:
         doc["hashed_password"] = None
+        doc.pop("password", None)
 
     result = await db.users.insert_one(doc)
+    inserted_id_str = str(result.inserted_id)
     
-    # Log audit
+    admin_id = str(current_admin.get("_id") or current_admin.get("id") or "SYSTEM")
+    admin_name = current_admin.get("name", "Administrator")
+
     await db.audit_logs.insert_one({
-        "admin_id": str(current_admin["_id"]),
-        "admin_name": current_admin.get("name"),
+        "admin_id": admin_id,
+        "admin_name": admin_name,
         "action": "EMPLOYEE_REGISTERED",
-        "target_user_id": str(result.inserted_id),
+        "target_user_id": inserted_id_str,
         "target_user_name": doc["name"],
-        "details": {"employee_id": doc["employee_id"], "role": doc["role"]},
+        "details": {"employee_id": doc["employee_id"], "role": doc["role"], "shift": doc.get("shift_name")},
         "timestamp": datetime.utcnow()
     })
 
     return {
         "message": "Employee registered successfully. Ready for face enrollment.",
-        "user_id": str(result.inserted_id),
+        "user_id": inserted_id_str,
         "employee_id": doc["employee_id"]
     }
 
 @router.post("/enroll-face")
 async def enroll_face(payload: FaceEnrollmentRequest, current_admin: dict = Depends(get_current_admin)):
     """
-    Captures multi-angle face samples (Front, Left, Right) and generates embeddings with DPDP Act consent.
+    Captures multi-angle face samples and generates embeddings with DPDP Act consent.
     """
     db = get_database()
+    
     try:
         user_obj_id = ObjectId(payload.user_id)
     except Exception:
@@ -70,37 +88,39 @@ async def enroll_face(payload: FaceEnrollmentRequest, current_admin: dict = Depe
         raise HTTPException(status_code=404, detail="Employee not found")
 
     if not payload.consent_given:
-        raise HTTPException(status_code=400, detail="Explicit consent is mandatory under DPDP Act 2023 for biometric enrollment.")
+        raise HTTPException(
+            status_code=400, 
+            detail="Biometric consent is mandatory under the DPDP Act 2023 for face enrollment."
+        )
 
     embeddings = []
-    sample_count = 0
-
-    for idx, img_b64 in enumerate(payload.face_images):
-        img = ai_service.decode_base64_image(img_b64)
-        if img is None:
+    for idx, b64_img in enumerate(payload.face_images):
+        img_np = ai_service.decode_base64_image(b64_img)
+        if img_np is None:
             continue
         
-        face_detected, is_live, cropped_face, meta = ai_service.detect_face_and_liveness(img)
-        if not face_detected:
-            continue
-        
-        emb = ai_service.generate_face_embedding(img)
+        emb = ai_service.generate_face_embedding(img_np)
         if emb:
             embeddings.append(emb)
-            sample_count += 1
 
-    if len(embeddings) == 0:
-        raise HTTPException(status_code=400, detail="Could not detect valid faces in the provided samples. Please retake photos with proper lighting.")
+    if not embeddings:
+        raise HTTPException(
+            status_code=400, 
+            detail="Could not generate valid facial embeddings from images. Please ensure face is centered with clear lighting."
+        )
+
+    admin_id = str(current_admin.get("_id") or current_admin.get("id") or "SYSTEM")
+    admin_name = current_admin.get("name", "Administrator")
 
     consent_record = {
         "consent_given": True,
-        "enrolled_by_admin_id": str(current_admin["_id"]),
-        "enrolled_by_admin_name": current_admin.get("name"),
+        "purpose": "Biometric Office Attendance Verification",
         "timestamp": payload.consent_timestamp or datetime.utcnow().isoformat(),
-        "num_samples": sample_count
+        "consented_by_admin": admin_name,
+        "compliance_act": "Digital Personal Data Protection Act (DPDP) 2023",
+        "vector_dimensions": len(embeddings[0]) if embeddings else 0
     }
 
-    # Store encrypted vector representations (never raw imagery)
     await db.users.update_one(
         {"_id": user_obj_id},
         {
@@ -112,10 +132,10 @@ async def enroll_face(payload: FaceEnrollmentRequest, current_admin: dict = Depe
         }
     )
 
-    # Log audit
+    sample_count = len(embeddings)
     await db.audit_logs.insert_one({
-        "admin_id": str(current_admin["_id"]),
-        "admin_name": current_admin.get("name"),
+        "admin_id": admin_id,
+        "admin_name": admin_name,
         "action": "FACE_ENROLLED",
         "target_user_id": str(user["_id"]),
         "target_user_name": user.get("name"),
@@ -129,6 +149,7 @@ async def enroll_face(payload: FaceEnrollmentRequest, current_admin: dict = Depe
         "sample_count": sample_count
     }
 
+@router.get("")
 @router.get("/")
 async def list_employees(
     department: Optional[str] = None,
@@ -155,11 +176,50 @@ async def list_employees(
             "department": u.get("department"),
             "designation": u.get("designation"),
             "employee_type": u.get("employee_type"),
+            "shift_name": u.get("shift_name", "General Shift"),
             "status": u.get("status", "Active"),
             "has_face_enrolled": len(u.get("face_embeddings", [])) > 0,
             "created_at": u.get("created_at")
         })
     return users
+
+@router.patch("/{user_id}")
+async def update_employee_details(
+    user_id: str, 
+    payload: UserUpdate, 
+    current_admin: dict = Depends(get_current_admin)
+):
+    db = get_database()
+    try:
+        user_obj_id = ObjectId(user_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    user = await db.users.find_one({"_id": user_obj_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_dict = {k: v for k, v in payload.dict().items() if v is not None}
+    if not update_dict:
+        return {"message": "No changes provided"}
+
+    update_dict["updated_at"] = datetime.utcnow()
+    await db.users.update_one({"_id": user_obj_id}, {"$set": update_dict})
+
+    admin_id = str(current_admin.get("_id") or current_admin.get("id") or "SYSTEM")
+    admin_name = current_admin.get("name", "Administrator")
+
+    await db.audit_logs.insert_one({
+        "admin_id": admin_id,
+        "admin_name": admin_name,
+        "action": "USER_DETAILS_UPDATED",
+        "target_user_id": user_id,
+        "target_user_name": user.get("name"),
+        "details": update_dict,
+        "timestamp": datetime.utcnow()
+    })
+
+    return {"message": "Employee details updated successfully"}
 
 @router.patch("/{user_id}/status")
 async def toggle_employee_status(user_id: str, new_status: UserStatus, current_admin: dict = Depends(get_current_admin)):
@@ -175,16 +235,20 @@ async def toggle_employee_status(user_id: str, new_status: UserStatus, current_a
 
     await db.users.update_one({"_id": user_obj_id}, {"$set": {"status": new_status.value, "updated_at": datetime.utcnow()}})
 
-    # Log audit
+    admin_id = str(current_admin.get("_id") or current_admin.get("id") or "SYSTEM")
+    admin_name = current_admin.get("name", "Administrator")
+
     await db.audit_logs.insert_one({
-        "admin_id": str(current_admin["_id"]),
-        "admin_name": current_admin.get("name"),
+        "admin_id": admin_id,
+        "admin_name": admin_name,
         "action": "USER_STATUS_CHANGED",
         "target_user_id": user_id,
         "target_user_name": user.get("name"),
         "details": {"new_status": new_status.value},
         "timestamp": datetime.utcnow()
     })
+
+    return {"message": f"Employee status updated to {new_status.value}"}
 
 @router.delete("/{user_id}")
 async def delete_employee(user_id: str, current_admin: dict = Depends(get_current_admin)):
@@ -199,19 +263,42 @@ async def delete_employee(user_id: str, current_admin: dict = Depends(get_curren
         raise HTTPException(status_code=404, detail="Employee not found")
 
     if user.get("role") == "Admin":
-        raise HTTPException(status_code=400, detail="Primary Admin account cannot be deleted")
+        raise HTTPException(status_code=400, detail="Root Administrator accounts cannot be deleted.")
 
+    # 1. Delete user
     await db.users.delete_one({"_id": user_obj_id})
-    await db.attendance.delete_many({"user_id": user_id})
 
-    # Log audit
+    # 2. Clean up attendance & leaves records for this employee
+    await db.attendance.delete_many({
+        "$or": [
+            {"user_id": user_id},
+            {"employee_id": user.get("employee_id")}
+        ]
+    })
+    await db.leaves.delete_many({
+        "$or": [
+            {"employee_id": user.get("employee_id")}
+        ]
+    })
+
+    # 3. Log to Audit
+    admin_id = str(current_admin.get("_id") or current_admin.get("id") or "SYSTEM")
+    admin_name = current_admin.get("name", "Administrator")
+
     await db.audit_logs.insert_one({
-        "admin_id": str(current_admin["_id"]),
-        "admin_name": current_admin.get("name"),
-        "action": "USER_DELETED",
+        "admin_id": admin_id,
+        "admin_name": admin_name,
+        "action": "EMPLOYEE_DELETED",
         "target_user_id": user_id,
         "target_user_name": user.get("name"),
+        "details": {"employee_id": user.get("employee_id")},
         "timestamp": datetime.utcnow()
     })
 
-    return {"message": f"Employee {user.get('name')} deleted successfully."}
+    # 4. Broadcast live update over WebSocket
+    await ws_manager.broadcast({
+        "event": "EMPLOYEE_DELETED",
+        "data": {"employee_id": user.get("employee_id"), "name": user.get("name")}
+    })
+
+    return {"message": f"Employee {user.get('name')} and associated attendance data deleted successfully"}

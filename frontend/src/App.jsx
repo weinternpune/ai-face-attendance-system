@@ -5,6 +5,8 @@ import Kiosk from './pages/Kiosk';
 import Dashboard from './pages/Dashboard';
 import Enrollment from './pages/Enrollment';
 import Employees from './pages/Employees';
+import Leaves from './pages/Leaves';
+import Shifts from './pages/Shifts';
 import Reports from './pages/Reports';
 import AuditLogs from './pages/AuditLogs';
 import Login from './pages/Login';
@@ -29,7 +31,7 @@ function Layout({ children }) {
   const isFullscreen = location.pathname === '/kiosk' || location.pathname === '/login';
 
   return (
-    <div className="min-h-screen bg-[#060913] flex flex-col">
+    <div className="min-h-screen bg-[#060913] flex flex-col font-sans">
       {!isFullscreen && <Navbar />}
       <main className="flex-1">{children}</main>
     </div>
@@ -56,6 +58,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/leaves" 
+            element={
+              <ProtectedRoute>
+                <Leaves />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/shifts" 
+            element={
+              <ProtectedRoute>
+                <Shifts />
               </ProtectedRoute>
             } 
           />

@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/client';
 import CustomSelect from '../components/CustomSelect';
 import { 
-  ShieldAlert,
-  ShieldCheck,
-  Activity,
-  Filter
+  ShieldAlert, 
+  ShieldCheck, 
+  Activity, 
+  Filter, 
+  RefreshCw 
 } from 'lucide-react';
 
 export default function AuditLogs() {
@@ -41,30 +42,53 @@ export default function AuditLogs() {
         return <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-sm">Manual Edit</span>;
       case 'FACE_ENROLLED':
         return <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm">Face Enrolled</span>;
+      case 'EMPLOYEE_REGISTERED':
+        return <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-sm">Staff Registered</span>;
+      case 'EMPLOYEE_DELETED':
+        return <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-sm">Staff Deleted</span>;
       default:
         return <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300">{action}</span>;
     }
   };
 
+  const formatTimestamp = (ts) => {
+    if (!ts) return '—';
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return String(ts);
+      return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • ${d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    } catch (e) {
+      return String(ts);
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-8 animate-fadeIn">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 lg:py-10 space-y-6 sm:space-y-8 animate-fadeIn font-sans">
       
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-3xl p-6 border border-slate-800 shadow-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-panel rounded-3xl p-5 sm:p-7 border border-slate-800 shadow-xl">
         <div>
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-widest text-amber-400">Security & DPDP Audit Trail</span>
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-widest text-amber-400">Security & DPDP Audit Trail</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1">Immutable Security Logs</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight mt-1">Immutable Security Logs</h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
             Traceable records of manual modifications, unknown face rejections, and biometric enrollments
           </p>
         </div>
+
+        <button
+          onClick={fetchLogs}
+          className="p-2.5 sm:p-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-2xl border border-slate-800 transition cursor-pointer self-start sm:self-auto"
+          title="Refresh Logs"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Filter Bar */}
-      <div className="glass-panel rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-slate-800">
+      <div className="glass-panel rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col sm:flex-row gap-4 items-center justify-between border border-slate-800 relative z-30">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
             <ShieldAlert className="w-5 h-5" />
@@ -75,7 +99,7 @@ export default function AuditLogs() {
           </div>
         </div>
 
-        <div className="w-full sm:w-64">
+        <div className="w-full sm:w-72">
           <CustomSelect
             value={actionFilter}
             onChange={(val) => setActionFilter(val)}
@@ -85,6 +109,8 @@ export default function AuditLogs() {
               { label: 'Anti-Spoof Blocked', value: 'SPOOF_ATTEMPT_BLOCKED' },
               { label: 'Manual Corrections', value: 'MANUAL_ATTENDANCE_CORRECTION' },
               { label: 'Face Enrollments', value: 'FACE_ENROLLED' },
+              { label: 'Staff Registered', value: 'EMPLOYEE_REGISTERED' },
+              { label: 'Staff Deleted', value: 'EMPLOYEE_DELETED' },
             ]}
             placeholder="All Security Events"
           />
@@ -97,7 +123,7 @@ export default function AuditLogs() {
           <table className="w-full text-left text-xs sm:text-sm text-slate-300 min-w-[700px]">
             <thead className="bg-slate-950/80 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
               <tr>
-                <th className="px-6 py-4">Timestamp</th>
+                <th className="px-6 py-4">Timestamp (IST)</th>
                 <th className="px-6 py-4">Security Action</th>
                 <th className="px-6 py-4">Triggered By</th>
                 <th className="px-6 py-4">Target Person</th>
@@ -114,8 +140,8 @@ export default function AuditLogs() {
               ) : (
                 logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-850/60 transition">
-                    <td className="px-6 py-4 font-mono text-xs text-slate-400">
-                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} • {new Date(log.timestamp).toLocaleDateString()}
+                    <td className="px-6 py-4 font-mono text-xs text-amber-400/90 whitespace-nowrap">
+                      {formatTimestamp(log.timestamp)}
                     </td>
                     <td className="px-6 py-4">{getActionBadge(log.action)}</td>
                     <td className="px-6 py-4 text-xs font-semibold text-white">
@@ -124,7 +150,7 @@ export default function AuditLogs() {
                     <td className="px-6 py-4 text-xs text-slate-300">
                       {log.target_user_name || '—'}
                     </td>
-                    <td className="px-6 py-4 text-xs font-mono text-slate-400 max-w-xs truncate">
+                    <td className="px-6 py-4 text-xs font-mono text-slate-400 max-w-xs truncate" title={JSON.stringify(log.details || {})}>
                       {JSON.stringify(log.details || {})}
                     </td>
                   </tr>
