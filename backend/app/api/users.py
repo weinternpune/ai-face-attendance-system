@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.database import get_database
 from app.models.user import UserCreate, UserResponse, FaceEnrollmentRequest, UserStatus
 from app.core.security import get_password_hash
-from app.api.auth import get_current_admin
+from app.api.auth import get_current_admin, get_current_user
 from app.services.ai_service import ai_service
 from app.core.websocket import ws_manager
 
@@ -302,3 +302,90 @@ async def delete_employee(user_id: str, current_admin: dict = Depends(get_curren
     })
 
     return {"message": f"Employee {user.get('name')} and associated attendance data deleted successfully"}
+
+# -------------------------------------------------------------
+# Phase 3 Module 4: Employee Self-Service Portal Endpoints
+# -------------------------------------------------------------
+
+@router.get("/me/profile")
+async def get_my_profile(current_user: dict = Depends(get_current_user)):
+    """Personal employee profile details"""
+    return {
+        "id": str(current_user.get("_id") or current_user.get("id")),
+        "name": current_user.get("name"),
+        "employee_id": current_user.get("employee_id"),
+        "email": current_user.get("email"),
+        "phone": current_user.get("phone"),
+        "role": current_user.get("role", "Employee"),
+        "department": current_user.get("department", "General"),
+        "designation": current_user.get("designation", "Staff"),
+        "employee_type": current_user.get("employee_type", "Full-Time"),
+        "shift_name": current_user.get("shift_name", "General Shift"),
+        "has_enrolled_face": len(current_user.get("face_embeddings", [])) > 0,
+        "enrolled_samples_count": len(current_user.get("face_embeddings", [])),
+        "status": current_user.get("status", "Active")
+    }
+
+@router.get("/me/attendance")
+async def get_my_attendance_history(current_user: dict = Depends(get_current_user)):
+    """Personal employee attendance logs"""
+    db = get_database()
+    u_id = str(current_user.get("_id") or current_user.get("id"))
+    emp_id = current_user.get("employee_id")
+
+    cursor = db.attendance.find({
+        "$or": [
+            {"user_id": u_id},
+            {"employee_id": emp_id}
+        ]
+    }).sort("date", -1).limit(60)
+
+    records = []
+    async for r in cursor:
+        records.append({
+            "id": str(r["_id"]),
+            "date": r.get("date"),
+            "entry_time": r.get("entry_time"),
+            "exit_time": r.get("exit_time") or "—",
+            "working_hours": r.get("working_hours", 0.0),
+            "overtime_hours": r.get("overtime_hours", 0.0),
+            "work_duration": r.get("work_duration", "In Progress"),
+            "status": r.get("status"),
+            "verification_mode": r.get("verification_mode", "KIOSK"),
+            "location_name": r.get("location_name")
+        })
+    return records
+
+@router.get("/me/leaves")
+async def get_my_leaves(current_user: dict = Depends(get_current_user)):
+    """Personal employee leave requests & balance tracking"""
+    db = get_database()
+    emp_id = current_user.get("employee_id")
+
+    cursor = db.leaves.find({"employee_id": emp_id}).sort("applied_at", -1)
+    leaves = []
+    async for l in cursor:
+        leaves.append({
+            "id": str(l["_id"]),
+            "leave_type": l.get("leave_type"),
+            "start_date": l.get("start_date"),
+            "end_date": l.get("end_date"),
+            "reason": l.get("reason"),
+            "status": l.get("status"),
+            "admin_remarks": l.get("admin_remarks"),
+            "applied_at": l.get("applied_at")
+        })
+
+    # Calculate standard balances (Casual: 12, Sick: 10, Paid: 15)
+    used_casual = sum(1 for l in leaves if l["leave_type"] == "Casual Leave" and l["status"] == "Approved")
+    used_sick = sum(1 for l in leaves if l["leave_type"] == "Sick Leave" and l["status"] == "Approved")
+    used_paid = sum(1 for l in leaves if l["leave_type"] == "Paid Leave" and l["status"] == "Approved")
+
+    return {
+        "leaves": leaves,
+        "balances": {
+            "casual_leave": {"total": 12, "used": used_casual, "remaining": max(0, 12 - used_casual)},
+            "sick_leave": {"total": 10, "used": used_sick, "remaining": max(0, 10 - used_sick)},
+            "paid_leave": {"total": 15, "used": used_paid, "remaining": max(0, 15 - used_paid)}
+        }
+    }

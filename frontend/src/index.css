@@ -2,9 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 :root {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   color-scheme: dark;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -18,6 +30,21 @@ body {
     radial-gradient(at 50% 50%, rgba(99, 102, 241, 0.04) 0px, transparent 60%);
   background-attachment: fixed;
   overflow-x: hidden;
+  touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* GPU Acceleration for ultra-smooth 60fps animations */
+.gpu-accelerated,
+.glass-panel,
+.card-hover,
+.btn-primary,
+button,
+a {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  touch-action: manipulation;
 }
 
 /* Custom modern smooth scrollbar */
@@ -45,12 +72,92 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
 .glass-panel-hover:hover {
   transform: translateY(-4px) scale(1.008);
   border-color: rgba(245, 158, 11, 0.45);
   box-shadow: 0 20px 40px -10px rgba(245, 158, 11, 0.22), 0 0 25px 0 rgba(245, 158, 11, 0.1);
+}
+
+/* Holographic Glowing Gradient Border */
+.hologram-border {
+  position: relative;
+  border-radius: 1.5rem;
+  z-index: 1;
+}
+.hologram-border::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: 1.6rem;
+  background: linear-gradient(90deg, #38bdf8, #f59e0b, #a855f7, #38bdf8);
+  background-size: 300% 300%;
+  animation: gradient-rotate 6s linear infinite;
+  z-index: -1;
+  opacity: 0.6;
+  filter: blur(1px);
+}
+
+/* Laser Scanline for Biometric Camera Viewports */
+.laser-scan {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.9), #38bdf8, rgba(56, 189, 248, 0.9), transparent);
+  box-shadow: 0 0 15px #38bdf8, 0 0 30px rgba(56, 189, 248, 0.6);
+  animation: laser-sweep 2.5s ease-in-out infinite alternate;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Biometric HUD Corner Reticles */
+.hud-corner-tl {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  border-top: 3px solid #38bdf8;
+  border-left: 3px solid #38bdf8;
+  border-top-left-radius: 8px;
+  pointer-events: none;
+}
+.hud-corner-tr {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border-top: 3px solid #38bdf8;
+  border-right: 3px solid #38bdf8;
+  border-top-right-radius: 8px;
+  pointer-events: none;
+}
+.hud-corner-bl {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  width: 24px;
+  height: 24px;
+  border-bottom: 3px solid #38bdf8;
+  border-left: 3px solid #38bdf8;
+  border-bottom-left-radius: 8px;
+  pointer-events: none;
+}
+.hud-corner-br {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border-bottom: 3px solid #38bdf8;
+  border-right: 3px solid #38bdf8;
+  border-bottom-right-radius: 8px;
+  pointer-events: none;
 }
 
 /* Card Interactive Hover Lift & Physics */
@@ -61,9 +168,9 @@ body {
               background-color 0.28s ease;
 }
 .card-hover:hover {
-  transform: translateY(-4px);
-  border-color: rgba(245, 158, 11, 0.45) !important;
-  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.85), 0 0 20px rgba(245, 158, 11, 0.15) !important;
+  transform: translateY(-5px);
+  border-color: rgba(245, 158, 11, 0.5) !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.85), 0 0 24px rgba(245, 158, 11, 0.2) !important;
 }
 
 /* Primary Button Styling */
@@ -89,7 +196,7 @@ body {
   left: -100%;
   width: 50%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   transform: skewX(-25deg);
   transition: none;
 }
@@ -266,6 +373,23 @@ input:focus, select:focus, textarea:focus {
   100% { opacity: 0.6; }
 }
 
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes laser-sweep {
+  0% { top: 4%; opacity: 0.2; }
+  50% { opacity: 0.95; }
+  100% { top: 96%; opacity: 0.2; }
+}
+
+@keyframes gradient-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .animate-spring-in {
   animation: spring-in 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -302,6 +426,14 @@ input:focus, select:focus, textarea:focus {
   animation: shimmer-pulse 2s infinite ease-in-out;
 }
 
+/* Glassmorphism Ultra Surface Utility */
+.glass-surface {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* Staggered Row Animation on Tables */
 tr {
   transition: background-color 0.2s ease, transform 0.2s ease;
@@ -314,3 +446,4 @@ tr:hover {
 button, a {
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
+

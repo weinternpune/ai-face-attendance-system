@@ -205,7 +205,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* Live Punch Alert Toast when WebSocket event fires */}
+      {lastLiveEvent && (
+        <div className="glass-panel p-3.5 sm:p-4 rounded-2xl border border-emerald-500/40 bg-emerald-950/20 shadow-lg flex items-center justify-between gap-3 animate-spring-in">
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
+            <div>
+              <span className="text-xs font-bold text-white">Live Attendance Punch Logged: </span>
+              <span className="text-xs text-emerald-400 font-extrabold">{lastLiveEvent.data?.employee_name || 'Staff Member'}</span>
+              <span className="text-[11px] text-slate-400 font-mono ml-2">({lastLiveEvent.data?.entry_time || 'Just now'})</span>
+            </div>
+          </div>
+          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-400/10 text-emerald-400 border border-emerald-400/20 font-bold uppercase">
+            {lastLiveEvent.data?.status || 'VERIFIED'}
+          </span>
+        </div>
+      )}
+
+      {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 animate-fade-slide-up">
         
         {/* Total Staff */}
@@ -278,6 +295,24 @@ export default function Dashboard() {
           </div>
         </div>
 
+      </div>
+
+      {/* Turnout Progress Bar Banner */}
+      <div className="glass-panel p-5 rounded-3xl border border-slate-800 shadow-xl space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400" /> Organization Turnout Rate
+          </span>
+          <span className="font-mono font-extrabold text-amber-400">
+            {stats.total_employees > 0 ? Math.round((stats.present / stats.total_employees) * 100) : 0}% Present
+          </span>
+        </div>
+        <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden p-0.5 border border-slate-800">
+          <div 
+            className="bg-gradient-to-r from-emerald-500 via-amber-400 to-cyan-400 h-full rounded-full transition-all duration-700 shadow-[0_0_12px_rgba(245,158,11,0.5)]" 
+            style={{ width: `${stats.total_employees > 0 ? Math.min(100, Math.round((stats.present / stats.total_employees) * 100)) : 0}%` }}
+          />
+        </div>
       </div>
 
       {/* Quick Access Modules Banner */}

@@ -27,6 +27,8 @@ export default function Kiosk() {
   const [voiceLang, setVoiceLang] = useState('en-US'); // 'en-US' or 'hi-IN'
   const [isMuted, setIsMuted] = useState(false);
   const [lastApiStatus, setLastApiStatus] = useState('Camera Ready');
+  const [activeChallengeMode, setActiveChallengeMode] = useState(false);
+  const [activeChallenge, setActiveChallenge] = useState({ challenge_type: 'SMILE', title: 'Smile at the Camera 😊', instruction: 'Please smile naturally to verify active human liveness' });
   
   const resetTimerRef = useRef(null);
   const audioContextRef = useRef(null);
@@ -183,26 +185,51 @@ export default function Kiosk() {
   const handleFrameCapture = async (base64Image) => {
     if (isProcessing || scanState !== 'STANDBY') return;
     setIsProcessing(true);
-    setLastApiStatus('Analyzing facial features...');
+    setLastApiStatus(activeChallengeMode ? `Checking active challenge: ${activeChallenge.title}...` : 'Analyzing facial features...');
 
     try {
-      const response = await apiClient.post('/attendance/verify', {
-        image_base64: base64Image,
-        device_id: 'KIOSK-ENTRANCE-01'
-      });
+      let response;
+      if (activeChallengeMode) {
+        response = await apiClient.post('/attendance/verify-active-challenge', {
+          image_base64: base64Image,
+          challenge_type: activeChallenge.challenge_type,
+          device_id: 'KIOSK-ENTRANCE-01'
+        });
+      } else {
+        response = await apiClient.post('/attendance/verify', {
+          image_base64: base64Image,
+          device_id: 'KIOSK-ENTRANCE-01'
+        });
+      }
 
       const res = response.data;
       setResultData(res);
       setLastApiStatus(res.message || res.status_code);
 
+      if (res.status_code === 'CHALLENGE_FAILED') {
+        setIsProcessing(false);
+        return;
+      }
+
       switch (res.status_code) {
         case 'MARKED_PRESENT':
         case 'MARKED_LATE':
+        case 'SUCCESS':
           setScanState('SUCCESS');
           playChime('success');
           speakFeedback(
             `Welcome ${res.user?.name || 'Employee'}. Attendance recorded.`,
             `Swagatam ${res.user?.name || 'Karmchari'}. Aapki attendance darj ho gayi hai.`
+          );
+          scheduleReset(4000);
+          break;
+
+        case 'CHECKOUT_SUCCESS':
+          setScanState('SUCCESS');
+          playChime('success');
+          speakFeedback(
+            `Goodbye ${res.user?.name || 'Employee'}. Exit recorded. Total ${res.working_hours} hours worked.`,
+            `Alvida ${res.user?.name || 'Karmchari'}. Aapka exit time darj ho gaya hai.`
           );
           scheduleReset(4000);
           break;
@@ -293,6 +320,19 @@ export default function Kiosk() {
           {/* Sound & Voice Toggle Controls */}
           <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
             <button
+              onClick={() => setActiveChallengeMode(!activeChallengeMode)}
+              title={activeChallengeMode ? "Active Anti-Spoofing Challenge: ON" : "Turn ON Active Challenge Shield"}
+              className={`p-2 rounded-xl transition flex items-center gap-1 text-xs font-bold cursor-pointer ${
+                activeChallengeMode
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span className="hidden md:inline">{activeChallengeMode ? 'Challenge ON' : 'Active Shield'}</span>
+            </button>
+
+            <button
               onClick={toggleMute}
               title={isMuted ? "Unmute Voice & Sound" : "Mute Sound"}
               className={`p-2 rounded-xl transition flex items-center gap-1 text-xs font-bold cursor-pointer ${
@@ -335,6 +375,36 @@ export default function Kiosk() {
         
         {/* Camera Column */}
         <div className="lg:col-span-7 space-y-3 sm:space-y-4">
+          
+          {/* Active Challenge Prompt Banner */}
+          {activeChallengeMode && scanState === 'STANDBY' && (
+            <div className="glass-panel p-4 rounded-2xl border border-amber-400/40 bg-amber-950/20 shadow-lg flex items-center justify-between gap-3 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-400 flex items-center justify-center font-bold text-lg">
+                  {activeChallenge.challenge_type === 'SMILE' ? '😊' : activeChallenge.challenge_type === 'BLINK' ? '👁️' : '🔄'}
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-white text-sm">{activeChallenge.title}</h4>
+                  <p className="text-xs text-amber-200/80">{activeChallenge.instruction}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const types = ['SMILE', 'BLINK', 'HEAD_TURN'];
+                  const next = types[(types.indexOf(activeChallenge.challenge_type) + 1) % types.length];
+                  setActiveChallenge({
+                    challenge_type: next,
+                    title: next === 'SMILE' ? 'Smile at the Camera 😊' : next === 'BLINK' ? 'Blink Your Eyes 👁️' : 'Turn Head Slightly 🔄',
+                    instruction: next === 'SMILE' ? 'Please smile naturally to verify active human liveness' : next === 'BLINK' ? 'Please blink your eyes naturally' : 'Please turn your head slightly to either side'
+                  });
+                }}
+                className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 font-semibold cursor-pointer shrink-0"
+              >
+                Change Challenge
+              </button>
+            </div>
+          )}
+
           <div className="relative rounded-3xl overflow-hidden shadow-[0_0_60px_rgba(245,158,11,0.12)]">
             <CameraFeed 
               onFrameCapture={handleFrameCapture} 

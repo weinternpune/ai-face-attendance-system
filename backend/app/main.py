@@ -8,7 +8,7 @@ from app.config import settings
 from app.database import connect_to_mongo, close_mongo_connection, get_database
 from app.core.security import get_password_hash
 from app.core.websocket import ws_manager
-from app.api import auth, users, attendance, reports, audit, shifts, leaves, notifications
+from app.api import auth, users, attendance, reports, audit, shifts, leaves, notifications, geofence, alerts
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("uvicorn")
@@ -50,6 +50,21 @@ async def lifespan(app: FastAPI):
         await db.shifts.insert_many(default_shifts)
         logger.info("Initialized default work shifts (General, Morning, Evening).")
 
+    # Auto-seed default office geofence if empty
+    existing_geofences = await db.geofences.count_documents({})
+    if existing_geofences == 0:
+        default_geofence = {
+            "name": "WeIntern Pune HQ",
+            "latitude": 18.5204,
+            "longitude": 73.8567,
+            "radius_meters": 150.0,
+            "address": "WeIntern Innovation Campus, FC Road, Pune, Maharashtra 411005",
+            "is_active": True,
+            "created_at": datetime.utcnow()
+        }
+        await db.geofences.insert_one(default_geofence)
+        logger.info("Initialized default Office Geofence (WeIntern Pune HQ).")
+
     yield
 
     # Shutdown
@@ -57,8 +72,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="WeIntern AI Face Attendance System",
-    version="2.0.0",
-    description="Production-grade AI Biometric Attendance, Kiosk, Shift & Leave Management API",
+    version="3.0.0",
+    description="Enterprise AI Biometric Attendance, Kiosk, Shifts, Leaves & Mobile Geofencing API",
     lifespan=lifespan
 )
 
@@ -80,6 +95,8 @@ app.include_router(audit.router, prefix="/api")
 app.include_router(shifts.router, prefix="/api")
 app.include_router(leaves.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(geofence.router, prefix="/api")
+app.include_router(alerts.router, prefix="/api")
 
 # Real-time WebSocket Endpoint
 @app.websocket("/ws/attendance")

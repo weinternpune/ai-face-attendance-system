@@ -18,14 +18,33 @@ class AttendanceRecord(BaseModel):
     date: str  # YYYY-MM-DD
     entry_time: str  # HH:MM:SS AM/PM
     exit_time: Optional[str] = None
+    working_hours: Optional[float] = None
+    overtime_hours: Optional[float] = None
+    work_duration: Optional[str] = None  # Full Day, Half Day, Short Hours
     status: AttendanceStatus = AttendanceStatus.PRESENT
     recognition_confidence: float
     device_id: Optional[str] = "KIOSK-01"
+    verification_mode: Optional[str] = "KIOSK"  # KIOSK or MOBILE_GEOFENCE
+    location_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    distance_meters: Optional[float] = None
     is_manual_correction: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class AttendanceVerifyRequest(BaseModel):
     image_base64: str
+    device_id: Optional[str] = "KIOSK-01"
+
+class MobileAttendanceVerifyRequest(BaseModel):
+    image_base64: str
+    latitude: float
+    longitude: float
+    device_id: Optional[str] = "MOBILE_SELF_SERVICE"
+
+class ActiveChallengeVerifyRequest(BaseModel):
+    image_base64: str
+    challenge_type: str = "SMILE" # "SMILE", "BLINK", "HEAD_TURN"
     device_id: Optional[str] = "KIOSK-01"
 
 class AttendanceCorrectionRequest(BaseModel):
