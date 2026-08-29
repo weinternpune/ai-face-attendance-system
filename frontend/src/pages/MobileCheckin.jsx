@@ -326,7 +326,7 @@ export default function MobileCheckin() {
         {/* Result Feedback Modal Card */}
         {verifyResult && (
           <div className={`glass-panel p-5 rounded-3xl border animate-fadeIn shadow-2xl space-y-3 ${
-            verifyResult.status_code === 'SUCCESS'
+            verifyResult.status_code === 'SUCCESS' || verifyResult.status_code === 'CHECKOUT_SUCCESS'
               ? 'border-emerald-500/50 bg-emerald-950/30'
               : verifyResult.status_code === 'ALREADY_MARKED'
               ? 'border-cyan-500/50 bg-cyan-950/30'
@@ -334,13 +334,13 @@ export default function MobileCheckin() {
           }`}>
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                verifyResult.status_code === 'SUCCESS'
+                verifyResult.status_code === 'SUCCESS' || verifyResult.status_code === 'CHECKOUT_SUCCESS'
                   ? 'bg-emerald-500/20 text-emerald-400'
                   : verifyResult.status_code === 'ALREADY_MARKED'
                   ? 'bg-cyan-500/20 text-cyan-400'
                   : 'bg-rose-500/20 text-rose-400'
               }`}>
-                {verifyResult.status_code === 'SUCCESS' ? (
+                {verifyResult.status_code === 'SUCCESS' || verifyResult.status_code === 'CHECKOUT_SUCCESS' ? (
                   <CheckCircle2 className="w-6 h-6" />
                 ) : verifyResult.status_code === 'ALREADY_MARKED' ? (
                   <Clock className="w-6 h-6" />
@@ -353,6 +353,8 @@ export default function MobileCheckin() {
                 <h4 className="font-bold text-white text-sm">
                   {verifyResult.status_code === 'SUCCESS'
                     ? 'Attendance Recorded!'
+                    : verifyResult.status_code === 'CHECKOUT_SUCCESS'
+                    ? 'Exit / Punch Out Recorded! (✅)'
                     : verifyResult.status_code === 'ALREADY_MARKED'
                     ? 'Already Clocked In Today'
                     : 'Verification Unsuccessful'}

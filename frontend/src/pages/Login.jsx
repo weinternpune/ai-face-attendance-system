@@ -19,7 +19,14 @@ export default function Login() {
       const res = await apiClient.post('/auth/login', { email, password });
       localStorage.setItem('weintern_token', res.data.access_token);
       localStorage.setItem('weintern_user', JSON.stringify(res.data.user));
-      navigate('/dashboard');
+
+      // Role-Based Smart Navigation
+      const role = res.data.user?.role;
+      if (role === 'Employee' || role === 'Intern') {
+        navigate('/portal');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Invalid email or password');
     } finally {
@@ -61,12 +68,13 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">Admin Email Address</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Email Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
                 required
+                placeholder="admin@weintern.com or employee email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:outline-none transition shadow-inner"
@@ -75,12 +83,13 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5">Master Password</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">Password</label>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
                 required
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:outline-none transition shadow-inner"
@@ -93,10 +102,47 @@ export default function Login() {
             disabled={loading}
             className="btn-primary w-full py-3.5 text-xs sm:text-sm rounded-2xl flex items-center justify-center gap-2 mt-2 cursor-pointer shadow-lg shadow-amber-500/25"
           >
-            {loading ? 'Authenticating...' : 'Sign In to Console'}
+            {loading ? 'Authenticating...' : 'Sign In to Portal'}
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        {/* Quick Demo Credentials Helper */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
+          <span className="font-semibold text-slate-600">1-Click Test Logins:</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('admin@weintern.com');
+                setPassword('admin@weintern123');
+              }}
+              className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 text-[10px] transition cursor-pointer"
+            >
+              Admin
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('hr@weintern.com');
+                setPassword('hr@weintern123');
+              }}
+              className="px-2 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold border border-purple-200 text-[10px] transition cursor-pointer"
+            >
+              HR
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('employee@weintern.com');
+                setPassword('weintern@123');
+              }}
+              className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold border border-amber-200 text-[10px] transition cursor-pointer"
+            >
+              Employee
+            </button>
+          </div>
+        </div>
 
         <div className="text-center pt-2 border-t border-slate-100 text-[11px] text-slate-400">
           WeIntern Technologies AI Biometrics • DPDP Act Compliant

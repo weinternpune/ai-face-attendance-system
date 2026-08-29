@@ -106,26 +106,39 @@ export default function Navbar() {
     }
   };
 
-  // Primary Navigation (Always visible on Desktop)
-  const primaryNav = [
-    { label: 'Live Kiosk', path: '/kiosk', icon: ScanFace, highlight: true },
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { label: 'My Portal', path: '/portal', icon: User },
-    { label: 'Mobile Check-In', path: '/mobile-checkin', icon: Smartphone },
+  // Dynamic Role-Based Navigation Matrix
+  const userRole = user.role || 'Employee';
+  const isAdmin = userRole === 'Admin';
+  const isHR = userRole === 'HR';
+  const isManagement = isAdmin || isHR;
+
+  // Primary Navigation
+  const primaryNav = isManagement
+    ? [
+        { label: 'Live Kiosk', path: '/kiosk', icon: ScanFace, highlight: true },
+        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'My Portal', path: '/portal', icon: User },
+        { label: 'Mobile Check-In', path: '/mobile-checkin', icon: Smartphone },
+      ]
+    : [
+        { label: 'My Portal', path: '/portal', icon: User, highlight: true },
+        { label: 'Mobile Check-In', path: '/mobile-checkin', icon: Smartphone },
+        { label: 'Live Kiosk', path: '/kiosk', icon: ScanFace },
+      ];
+
+  // Administration Management Tools (Filtered strictly by Role)
+  const allAdminNav = [
+    { label: 'Payroll Engine', path: '/payroll', icon: DollarSign, desc: 'Working hours, OT & monthly salary statements', roles: ['Admin', 'HR'] },
+    { label: 'Geofence Settings', path: '/geofence', icon: MapPin, desc: 'Office GPS perimeter & remote check-in radius', roles: ['Admin'] },
+    { label: 'Employee Directory', path: '/employees', icon: Users, desc: 'Manage workforce profiles & designations', roles: ['Admin', 'HR'] },
+    { label: 'Face Biometrics Enrollment', path: '/enroll', icon: UserPlus, desc: 'Multi-angle AI face embedding enrollment', roles: ['Admin', 'HR'] },
+    { label: 'Leaves Management', path: '/leaves', icon: Calendar, desc: 'Approve, reject & track staff time off', roles: ['Admin', 'HR'] },
+    { label: 'Shift Roster Master', path: '/shifts', icon: Clock, desc: 'Configure shift timings & grace periods', roles: ['Admin'] },
+    { label: 'Analytics Reports', path: '/reports', icon: FileSpreadsheet, desc: '7-day turnout trends & performance metrics', roles: ['Admin', 'HR'] },
+    { label: 'Security Audit Logs', path: '/audit', icon: ShieldAlert, desc: 'Immutable compliance trail & system events', roles: ['Admin'] },
   ];
 
-  // Administration Management Tools (In Dropdown on Desktop, Full List on Mobile)
-  const adminNav = [
-    { label: 'Payroll Engine', path: '/payroll', icon: DollarSign, desc: 'Working hours, OT & monthly salary statements' },
-    { label: 'Geofence Settings', path: '/geofence', icon: MapPin, desc: 'Office GPS perimeter & remote check-in radius' },
-    { label: 'Employee Directory', path: '/employees', icon: Users, desc: 'Manage workforce profiles & designations' },
-    { label: 'Face Biometrics Enrollment', path: '/enroll', icon: UserPlus, desc: 'Multi-angle AI face embedding enrollment' },
-    { label: 'Leaves Management', path: '/leaves', icon: Calendar, desc: 'Approve, reject & track staff time off' },
-    { label: 'Shift Roster Master', path: '/shifts', icon: Clock, desc: 'Configure shift timings & grace periods' },
-    { label: 'Analytics Reports', path: '/reports', icon: FileSpreadsheet, desc: '7-day turnout trends & performance metrics' },
-    { label: 'Security Audit Logs', path: '/audit', icon: ShieldAlert, desc: 'Immutable compliance trail & system events' },
-  ];
-
+  const adminNav = allAdminNav.filter(item => item.roles.includes(userRole));
   const isAdminActive = adminNav.some(item => location.pathname === item.path);
 
   return (
@@ -177,56 +190,58 @@ export default function Navbar() {
               );
             })}
 
-            {/* Admin Management Tools Dropdown */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setAdminDropdownOpen(!adminDropdownOpen)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
-                  isAdminActive
-                    ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90 font-extrabold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 font-semibold'
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5 text-slate-500" />
-                <span>Management</span>
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${adminDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
+            {/* Admin Management Tools Dropdown (Only if user has management permissions) */}
+            {adminNav.length > 0 && (
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setAdminDropdownOpen(!adminDropdownOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
+                    isAdminActive
+                      ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90 font-extrabold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/70 font-semibold'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Management</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${adminDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
 
-              {/* Dropdown Menu */}
-              {adminDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 z-50 animate-spring-in space-y-1">
-                  <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100">
-                    Administration & Tools
+                {/* Dropdown Menu */}
+                {adminDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 z-50 animate-spring-in space-y-1">
+                    <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                      Administration & Tools
+                    </div>
+                    <div className="max-h-80 overflow-y-auto space-y-0.5 pr-1">
+                      {adminNav.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.path;
+                        return (
+                          <Link
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setAdminDropdownOpen(false)}
+                            className={`flex items-start gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
+                              isActive
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200/80 font-extrabold'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900 leading-tight">{item.label}</div>
+                              <p className="text-[10px] text-slate-500 font-normal mt-0.5 leading-snug">{item.desc}</p>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="max-h-80 overflow-y-auto space-y-0.5 pr-1">
-                    {adminNav.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = location.pathname === item.path;
-                      return (
-                        <Link
-                          key={item.path}
-                          to={item.path}
-                          onClick={() => setAdminDropdownOpen(false)}
-                          className={`flex items-start gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
-                            isActive
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200/80 font-extrabold'
-                              : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          <div className={`p-1.5 rounded-lg shrink-0 mt-0.5 ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-900 leading-tight">{item.label}</div>
-                            <p className="text-[10px] text-slate-500 font-normal mt-0.5 leading-snug">{item.desc}</p>
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Action Controls: Notification Bell, Profile, Mobile Menu */}
@@ -381,32 +396,34 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Admin Management Tools */}
-          <div className="space-y-1 pt-2 border-t border-slate-100">
-            <div className="px-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Management & Settings</div>
-            {adminNav.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200/80 font-extrabold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 text-slate-500" />
-                    <span>{item.label}</span>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                </Link>
-              );
-            })}
-          </div>
+          {/* Admin Management Tools (Only if user has management permissions) */}
+          {adminNav.length > 0 && (
+            <div className="space-y-1 pt-2 border-t border-slate-100">
+              <div className="px-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Management & Settings</div>
+              {adminNav.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200/80 font-extrabold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon className="w-4 h-4 text-slate-500" />
+                      <span>{item.label}</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
         </div>
       )}

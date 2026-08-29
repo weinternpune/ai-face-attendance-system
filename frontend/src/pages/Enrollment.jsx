@@ -88,7 +88,8 @@ export default function Enrollment() {
 
     try {
       const res = await apiClient.post('/users/', formData);
-      setCreatedUserId(res.data.id);
+      const uid = res.data.user_id || res.data.id || res.data._id;
+      setCreatedUserId(uid);
       setStep(2);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to register employee');
@@ -118,13 +119,19 @@ export default function Enrollment() {
       setError('DPDP biometric consent agreement must be checked before submitting.');
       return;
     }
+    if (!createdUserId) {
+      setError('User ID not found. Please restart registration.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
-      await apiClient.post(`/users/${createdUserId}/enroll-face`, {
-        images_base64: capturedImages,
-        dpdp_consent: consentGiven
+      await apiClient.post('/users/enroll-face', {
+        user_id: createdUserId,
+        face_images: capturedImages,
+        consent_given: consentGiven,
+        consent_timestamp: new Date().toISOString()
       });
       setStep(3);
     } catch (err) {
@@ -311,22 +318,25 @@ export default function Enrollment() {
               icon={Clock}
             />
 
-            {/* Password input for Admin/HR */}
-            {(formData.role === 'Admin' || formData.role === 'HR') && (
-              <div className="sm:col-span-2 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 space-y-2 animate-fadeIn">
-                <label className="block text-xs font-bold text-amber-400">
-                  Set Dashboard Login Password (Required for Admin/HR)
+            {/* Password Input for all roles */}
+            <div className="sm:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-300">
+                  Portal Login Password
                 </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Enter login password for this admin/HR"
-                  value={formData.password || ''}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-950 border border-amber-400/40 rounded-xl text-xs sm:text-sm text-white focus:border-amber-400 focus:outline-none shadow-inner"
-                />
+                <span className="text-[11px] text-amber-400 font-medium">
+                  {formData.role === 'Admin' || formData.role === 'HR' ? '* Required for Admin/HR' : 'Optional (Default: weintern@123)'}
+                </span>
               </div>
-            )}
+              <input
+                type="password"
+                required={formData.role === 'Admin' || formData.role === 'HR'}
+                placeholder={formData.role === 'Admin' || formData.role === 'HR' ? 'Enter strong administrative password' : 'Enter unique password (or leave empty for weintern@123)'}
+                value={formData.password || ''}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm text-white focus:border-amber-400 focus:outline-none shadow-inner"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end pt-4 border-t border-slate-800">

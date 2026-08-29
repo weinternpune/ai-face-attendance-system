@@ -22,6 +22,7 @@ class UserUpdate(BaseModel):
     employee_type: Optional[str] = None
     shift_name: Optional[str] = None
     status: Optional[str] = None
+    password: Optional[str] = None
 
 @router.post("", response_model=dict)
 @router.post("/", response_model=dict)
@@ -42,12 +43,9 @@ async def create_employee(user_in: UserCreate, current_admin: dict = Depends(get
     doc["created_at"] = datetime.utcnow()
     doc["face_embeddings"] = []
     
-    if user_in.password and len(user_in.password.strip()) > 0:
-        doc["hashed_password"] = get_password_hash(user_in.password.strip())
-        doc.pop("password", None)
-    else:
-        doc["hashed_password"] = None
-        doc.pop("password", None)
+    raw_pwd = user_in.password.strip() if user_in.password and len(user_in.password.strip()) > 0 else "weintern@123"
+    doc["hashed_password"] = get_password_hash(raw_pwd)
+    doc.pop("password", None)
 
     result = await db.users.insert_one(doc)
     inserted_id_str = str(result.inserted_id)
@@ -72,14 +70,23 @@ async def create_employee(user_in: UserCreate, current_admin: dict = Depends(get
     }
 
 @router.post("/enroll-face")
-async def enroll_face(payload: FaceEnrollmentRequest, current_admin: dict = Depends(get_current_admin)):
+@router.post("/{user_id}/enroll-face")
+async def enroll_face(
+    payload: FaceEnrollmentRequest, 
+    user_id: Optional[str] = None, 
+    current_admin: dict = Depends(get_current_admin)
+):
     """
     Captures multi-angle face samples and generates embeddings with DPDP Act consent.
     """
     db = get_database()
     
+    target_user_id = user_id or payload.user_id
+    if not target_user_id:
+        raise HTTPException(status_code=400, detail="User ID is required for face enrollment.")
+
     try:
-        user_obj_id = ObjectId(payload.user_id)
+        user_obj_id = ObjectId(target_user_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid user ID format")
 
@@ -87,14 +94,19 @@ async def enroll_face(payload: FaceEnrollmentRequest, current_admin: dict = Depe
     if not user:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    if not payload.consent_given:
+    consent = payload.consent_given if payload.dpdp_consent is None else payload.dpdp_consent
+    if not consent:
         raise HTTPException(
             status_code=400, 
             detail="Biometric consent is mandatory under the DPDP Act 2023 for face enrollment."
         )
 
+    images = payload.face_images or payload.images_base64 or []
+    if not images:
+        raise HTTPException(status_code=400, detail="No face images provided for enrollment.")
+
     embeddings = []
-    for idx, b64_img in enumerate(payload.face_images):
+    for idx, b64_img in enumerate(images):
         img_np = ai_service.decode_base64_image(b64_img)
         if img_np is None:
             continue
@@ -145,7 +157,7 @@ async def enroll_face(payload: FaceEnrollmentRequest, current_admin: dict = Depe
 
     return {
         "message": f"Successfully enrolled face with {sample_count} multi-angle samples.",
-        "user_id": payload.user_id,
+        "user_id": target_user_id,
         "sample_count": sample_count
     }
 
@@ -202,6 +214,11 @@ async def update_employee_details(
     update_dict = {k: v for k, v in payload.dict().items() if v is not None}
     if not update_dict:
         return {"message": "No changes provided"}
+
+    if "password" in update_dict:
+        raw_pwd = update_dict.pop("password")
+        if raw_pwd and len(str(raw_pwd).strip()) > 0:
+            update_dict["hashed_password"] = get_password_hash(str(raw_pwd).strip())
 
     update_dict["updated_at"] = datetime.utcnow()
     await db.users.update_one({"_id": user_obj_id}, {"$set": update_dict})
@@ -389,3 +406,26 @@ async def get_my_leaves(current_user: dict = Depends(get_current_user)):
             "paid_leave": {"total": 15, "used": used_paid, "remaining": max(0, 15 - used_paid)}
         }
     }
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/me/change-password")
+async def change_my_password(payload: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    db = get_database()
+    user_id = current_user.get("_id")
+    
+    if current_user.get("hashed_password"):
+        from app.core.security import verify_password
+        if not verify_password(payload.current_password, current_user["hashed_password"]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    
+    if len(payload.new_password.strip()) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+        
+    await db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"hashed_password": get_password_hash(payload.new_password.strip()), "updated_at": datetime.utcnow()}}
+    )
+    return {"message": "Password changed successfully."}

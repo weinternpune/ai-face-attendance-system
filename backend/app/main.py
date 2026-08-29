@@ -39,6 +39,48 @@ async def lifespan(app: FastAPI):
         await db.users.insert_one(admin_doc)
         logger.info(f"Initialized default Admin account: {settings.DEFAULT_ADMIN_EMAIL}")
 
+    # Auto-seed default demo employee
+    existing_employee = await db.users.find_one({"email": "employee@weintern.com"})
+    if not existing_employee:
+        emp_doc = {
+            "name": "Demo Staff Member",
+            "employee_id": "EMP101",
+            "email": "employee@weintern.com",
+            "phone": "+91-9876500000",
+            "role": "Employee",
+            "department": "Engineering",
+            "designation": "Software Engineer",
+            "employee_type": "Full-Time",
+            "shift_name": "General Shift",
+            "status": "Active",
+            "hashed_password": get_password_hash("weintern@123"),
+            "face_embeddings": [],
+            "created_at": datetime.utcnow()
+        }
+        await db.users.insert_one(emp_doc)
+        logger.info("Initialized default Demo Employee account: employee@weintern.com (pwd: weintern@123)")
+
+    # Auto-seed default HR account
+    existing_hr = await db.users.find_one({"email": "hr@weintern.com"})
+    if not existing_hr:
+        hr_doc = {
+            "name": "HR Operations Lead",
+            "employee_id": "HR001",
+            "email": "hr@weintern.com",
+            "phone": "+91-9876511111",
+            "role": "HR",
+            "department": "Human Resources",
+            "designation": "HR Manager",
+            "employee_type": "Full-Time",
+            "shift_name": "General Shift",
+            "status": "Active",
+            "hashed_password": get_password_hash("hr@weintern123"),
+            "face_embeddings": [],
+            "created_at": datetime.utcnow()
+        }
+        await db.users.insert_one(hr_doc)
+        logger.info("Initialized default HR account: hr@weintern.com (pwd: hr@weintern123)")
+
     # Auto-seed default shifts if empty
     existing_shifts = await db.shifts.count_documents({})
     if existing_shifts == 0:
@@ -54,16 +96,16 @@ async def lifespan(app: FastAPI):
     existing_geofences = await db.geofences.count_documents({})
     if existing_geofences == 0:
         default_geofence = {
-            "name": "WeIntern Pune HQ",
-            "latitude": 18.5204,
-            "longitude": 73.8567,
+            "name": "WeIntern Pvt Ltd - City Vista",
+            "latitude": 18.5529,
+            "longitude": 73.9436,
             "radius_meters": 150.0,
-            "address": "WeIntern Innovation Campus, FC Road, Pune, Maharashtra 411005",
+            "address": "Office 05, 3rd Floor, B Wing, City Vista, Fountain Road, Kharadi, Pune, Maharashtra 411014",
             "is_active": True,
             "created_at": datetime.utcnow()
         }
         await db.geofences.insert_one(default_geofence)
-        logger.info("Initialized default Office Geofence (WeIntern Pune HQ).")
+        logger.info("Initialized default Office Geofence (WeIntern Pvt Ltd - City Vista).")
 
     yield
 

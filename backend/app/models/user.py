@@ -35,9 +35,11 @@ class UserCreate(UserBase):
     password: Optional[str] = None
 
 class FaceEnrollmentRequest(BaseModel):
-    user_id: str
-    face_images: List[str]  # Base64 encoded images (Front, Left, Right, Neutral)
+    user_id: Optional[str] = None
+    face_images: Optional[List[str]] = None  # Base64 encoded images (Front, Left, Right, Neutral)
+    images_base64: Optional[List[str]] = None
     consent_given: bool = True
+    dpdp_consent: Optional[bool] = None
     consent_timestamp: Optional[str] = None
 
 class UserResponse(UserBase):

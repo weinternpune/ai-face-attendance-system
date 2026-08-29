@@ -84,7 +84,8 @@ export default function Employees() {
       designation: emp.designation || '',
       employee_type: emp.employee_type || 'Intern',
       shift_name: emp.shift_name || 'General Shift',
-      phone: emp.phone || ''
+      phone: emp.phone || '',
+      password: ''
     });
     setEditError('');
     setEditSuccess('');
@@ -444,6 +445,20 @@ export default function Employees() {
                     className="w-full bg-slate-950 border border-slate-800 rounded-2xl pl-10 pr-4 py-3 text-white focus:outline-none focus:border-amber-400 shadow-inner"
                   />
                 </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-slate-300 font-semibold">Reset Login Password</label>
+                  <span className="text-[10px] text-slate-500">Leave blank to keep unchanged</span>
+                </div>
+                <input
+                  type="password"
+                  placeholder="Enter new password (optional)"
+                  value={editFormData.password || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-amber-400 shadow-inner text-sm"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">

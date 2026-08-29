@@ -49,6 +49,20 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     }
 
 async def get_current_admin(current_user: dict = Depends(get_current_user)):
+    user_role = current_user.get("role")
+    if user_role not in ["Admin", "HR"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative or HR privileges required for this action."
+        )
+    return current_user
+
+async def get_current_super_admin(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Root Administrator privileges required for this action."
+        )
     return current_user
 
 @router.post("/login", response_model=TokenResponse)
@@ -68,18 +82,23 @@ async def login(credentials: Optional[LoginRequest] = None, form_data: Optional[
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email and password required")
 
-    user = await db.users.find_one({"email": email.lower()})
+    user = await db.users.find_one({"email": email.lower().strip()})
     
-    if not user or not user.get("hashed_password"):
+    if not user:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
-    if not verify_password(password, user["hashed_password"]):
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    if user.get("hashed_password"):
+        if not verify_password(password, user["hashed_password"]):
+            raise HTTPException(status_code=400, detail="Incorrect email or password")
+    else:
+        # Default fallback password for employees created without explicit password
+        if password not in ["weintern@123", "employee@123", "admin@weintern123"]:
+            raise HTTPException(status_code=400, detail="Incorrect password. Default employee password is weintern@123")
     
     if user.get("status") == "Disabled":
         raise HTTPException(status_code=403, detail="Account is disabled. Please contact administrator.")
 
-    token = create_access_token(data={"sub": str(user["_id"]), "role": user.get("role")})
+    token = create_access_token(data={"sub": str(user["_id"]), "role": user.get("role", "Employee")})
     
     user_info = {
         "id": str(user["_id"]),

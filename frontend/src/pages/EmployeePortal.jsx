@@ -17,7 +17,9 @@ import {
   X,
   Building2,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Lock,
+  Key
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -35,6 +37,15 @@ export default function EmployeePortal() {
   const [reason, setReason] = useState('');
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [submittingLeave, setSubmittingLeave] = useState(false);
+
+  // Change Password Modal
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState('');
 
   const fetchPortalData = async () => {
     setLoading(true);
@@ -82,6 +93,41 @@ export default function EmployeePortal() {
     }
   };
 
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPwdError('');
+    setPwdSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setPwdError('New passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPwdError('New password must be at least 6 characters.');
+      return;
+    }
+
+    setPwdLoading(true);
+    try {
+      await apiClient.post('/users/me/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword
+      });
+      setPwdSuccess('Password changed successfully! You can use your new password next time.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        setPasswordModalOpen(false);
+        setPwdSuccess('');
+      }, 1500);
+    } catch (err) {
+      setPwdError(err.response?.data?.detail || 'Failed to update password.');
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   const totalPresent = attendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
   const totalLate = attendance.filter(a => a.status === 'Late').length;
   const totalHours = attendance.reduce((acc, a) => acc + (a.working_hours || 0), 0);
@@ -111,13 +157,27 @@ export default function EmployeePortal() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
+        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
           <button
             onClick={fetchPortalData}
             title="Refresh Data"
             className="p-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-2xl border border-slate-800 transition cursor-pointer"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-400' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => {
+              setPwdError('');
+              setPwdSuccess('');
+              setCurrentPassword('');
+              setNewPassword('');
+              setConfirmPassword('');
+              setPasswordModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 sm:py-3 bg-slate-900 hover:bg-slate-800 text-slate-200 rounded-2xl border border-slate-800 text-xs sm:text-sm font-semibold transition cursor-pointer"
+          >
+            <Key className="w-4 h-4 text-amber-400" /> Change Password
           </button>
           
           <Link
@@ -410,6 +470,100 @@ export default function EmployeePortal() {
                   className="btn-primary px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-amber-500/20 cursor-pointer"
                 >
                   {submittingLeave ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {passwordModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Change Login Password</h3>
+                  <p className="text-[11px] text-slate-400">Update your personal portal account password</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPasswordModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {pwdError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{pwdError}</span>
+              </div>
+            )}
+
+            {pwdSuccess && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{pwdSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Current Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 shadow-inner"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">New Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="At least 6 characters"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 shadow-inner"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Confirm New Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Re-enter new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400 shadow-inner"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setPasswordModalOpen(false)}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-400 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={pwdLoading}
+                  className="btn-primary px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-amber-500/20 cursor-pointer"
+                >
+                  {pwdLoading ? 'Updating...' : 'Update Password'}
                 </button>
               </div>
             </form>

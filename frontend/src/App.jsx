@@ -24,19 +24,37 @@ function ScrollToTop() {
   return null;
 }
 
-// Protected route wrapper to redirect to login if no auth token
-function ProtectedRoute({ children }) {
+// Protected route wrapper with strict Role-Based Access Control (RBAC)
+function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem('weintern_token');
   if (!token) {
     return <Navigate to="/login" replace />;
   }
+  
+  if (allowedRoles && allowedRoles.length > 0) {
+    const user = JSON.parse(localStorage.getItem('weintern_user') || '{}');
+    const userRole = user.role || 'Employee';
+    if (!allowedRoles.includes(userRole)) {
+      // If employee tries to access admin-only route, redirect to employee portal
+      return <Navigate to="/portal" replace />;
+    }
+  }
+
   return children;
 }
 
-// Redirects logged in user from /login or / to /dashboard
+// Smart Root Redirect based on Authentication & Role
 function RootRedirect() {
   const token = localStorage.getItem('weintern_token');
-  return <Navigate to={token ? "/dashboard" : "/login"} replace />;
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  const user = JSON.parse(localStorage.getItem('weintern_user') || '{}');
+  const userRole = user.role || 'Employee';
+  if (userRole === 'Employee' || userRole === 'Intern') {
+    return <Navigate to="/portal" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 }
 
 function Layout({ children }) {
@@ -71,11 +89,11 @@ export default function App() {
           {/* Admin Login */}
           <Route path="/login" element={<Login />} />
           
-          {/* Protected Admin/HR Routes */}
+          {/* Protected Routes by Role */}
           <Route 
             path="/portal" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin', 'HR', 'Employee', 'Intern']}>
                 <EmployeePortal />
               </ProtectedRoute>
             } 
@@ -83,7 +101,7 @@ export default function App() {
           <Route 
             path="/dashboard" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin', 'HR']}>
                 <Dashboard />
               </ProtectedRoute>
             } 
@@ -91,7 +109,7 @@ export default function App() {
           <Route 
             path="/leaves" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin', 'HR']}>
                 <Leaves />
               </ProtectedRoute>
             } 
@@ -99,7 +117,7 @@ export default function App() {
           <Route 
             path="/shifts" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin']}>
                 <Shifts />
               </ProtectedRoute>
             } 
@@ -107,7 +125,7 @@ export default function App() {
           <Route 
             path="/geofence" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin']}>
                 <GeofenceSettings />
               </ProtectedRoute>
             } 
@@ -115,7 +133,7 @@ export default function App() {
           <Route 
             path="/enroll" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin', 'HR']}>
                 <Enrollment />
               </ProtectedRoute>
             } 
@@ -123,7 +141,7 @@ export default function App() {
           <Route 
             path="/employees" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin', 'HR']}>
                 <Employees />
               </ProtectedRoute>
             } 
@@ -131,7 +149,7 @@ export default function App() {
           <Route 
             path="/reports" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin', 'HR']}>
                 <Reports />
               </ProtectedRoute>
             } 
@@ -139,7 +157,7 @@ export default function App() {
           <Route 
             path="/payroll" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin', 'HR']}>
                 <Payroll />
               </ProtectedRoute>
             } 
@@ -147,7 +165,7 @@ export default function App() {
           <Route 
             path="/audit" 
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={['Admin']}>
                 <AuditLogs />
               </ProtectedRoute>
             } 
