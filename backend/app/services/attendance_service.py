@@ -229,8 +229,33 @@ class AttendanceService:
             "created_at": datetime.utcnow()
         }
 
-        result = await db.attendance.insert_one(attendance_doc)
-        attendance_id = str(result.inserted_id)
+        try:
+            result = await db.attendance.insert_one(attendance_doc)
+            attendance_id = str(result.inserted_id)
+        except Exception:
+            # If concurrent scan already inserted the record, return duplicate response
+            existing_record = await db.attendance.find_one({
+                "user_id": user_id_str,
+                "date": today_date
+            })
+            if existing_record:
+                return {
+                    "status_code": "ALREADY_MARKED",
+                    "message": "Attendance already marked for today",
+                    "user": {
+                        "id": user_id_str,
+                        "name": user["name"],
+                        "employee_id": user["employee_id"],
+                        "department": user.get("department", "General"),
+                        "role": user.get("role", "Employee")
+                    },
+                    "entry_time": existing_record.get("entry_time"),
+                    "status": existing_record.get("status"),
+                    "confidence": confidence,
+                    "verification_mode": existing_record.get("verification_mode", "KIOSK"),
+                    "location_name": existing_record.get("location_name")
+                }
+            attendance_id = "DUPLICATE"
 
         # If marked Late, create a notification
         if status == AttendanceStatus.LATE:

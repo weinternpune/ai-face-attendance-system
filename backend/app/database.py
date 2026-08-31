@@ -19,7 +19,7 @@ async def connect_to_mongo():
     try:
         await db.db.users.create_index("email", unique=True)
         await db.db.users.create_index("employee_id", unique=True)
-        await db.db.attendance.create_index([("user_id", 1), ("date", 1)])
+        await db.db.attendance.create_index([("user_id", 1), ("date", 1)], unique=True)
         await db.db.attendance.create_index("date")
         await db.db.audit_logs.create_index("timestamp")
         logger.info("MongoDB connected successfully with required indexes.")

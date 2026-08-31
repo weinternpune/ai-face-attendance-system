@@ -22,6 +22,7 @@ import {
   Key
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import CustomSelect from '../components/CustomSelect';
 
 export default function EmployeePortal() {
   const [profile, setProfile] = useState(null);
@@ -190,37 +191,36 @@ export default function EmployeePortal() {
       </div>
 
       {/* Metric Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 animate-fade-slide-up">
         
-        <div className="glass-panel card-hover p-5 rounded-3xl border border-emerald-500/20 space-y-1.5">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 hover:border-emerald-400/60 space-y-1.5 shadow-xl">
           <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-400">Total Check-Ins</span>
           <div className="text-2xl sm:text-3xl font-black text-emerald-400">{totalPresent} Days</div>
           <p className="text-[10px] text-emerald-400/80">Logged in this cycle</p>
         </div>
 
-        <div className="glass-panel card-hover p-5 rounded-3xl border border-amber-500/20 space-y-1.5">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/30 hover:border-amber-400/60 space-y-1.5 shadow-xl">
           <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">Late Check-Ins</span>
           <div className="text-2xl sm:text-3xl font-black text-amber-400">{totalLate} Days</div>
           <p className="text-[10px] text-amber-400/80">After grace period</p>
         </div>
 
-        <div className="glass-panel card-hover p-5 rounded-3xl border border-cyan-500/20 space-y-1.5">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 border border-cyan-500/30 hover:border-cyan-400/60 space-y-1.5 shadow-xl">
           <span className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-400">Productive Hours</span>
           <div className="text-2xl sm:text-3xl font-black text-cyan-400">{roundHours(totalHours)} hrs</div>
           <p className="text-[10px] text-cyan-400/80">Total working time</p>
         </div>
 
-        <div className="glass-panel card-hover p-5 rounded-3xl border border-purple-500/20 space-y-1.5">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-950 border border-purple-500/30 hover:border-purple-400/60 space-y-1.5 shadow-xl">
           <span className="text-[11px] font-extrabold uppercase tracking-widest text-purple-400">Biometric Face</span>
           <div className="text-sm sm:text-base font-black text-white flex items-center gap-1.5 mt-2">
             <ShieldCheck className="w-5 h-5 text-purple-400" />
             {profile?.has_enrolled_face ? 'Face Enrolled' : 'Not Enrolled'}
           </div>
-          <p className="text-[10px] text-slate-400">
-            {profile?.enrolled_samples_count || 0} multi-angle samples
+          <p className="text-[10px] text-purple-400/80">
+            {profile?.has_enrolled_face ? 'DPDP Compliant (Active)' : 'Action required'}
           </p>
         </div>
-
       </div>
 
       {/* Leave Balances & Actions Grid */}
@@ -395,17 +395,18 @@ export default function EmployeePortal() {
 
             <form onSubmit={handleApplyLeave} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Category *</label>
-                <select
+                <CustomSelect
+                  label="Leave Category *"
                   value={leaveType}
-                  onChange={(e) => setLeaveType(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-amber-400"
-                >
-                  <option value="Casual Leave">Casual Leave (CL)</option>
-                  <option value="Sick Leave">Sick Leave (SL)</option>
-                  <option value="Paid Leave">Paid Annual Leave (PL)</option>
-                  <option value="Unpaid Leave">Unpaid Leave</option>
-                </select>
+                  onChange={(val) => setLeaveType(val)}
+                  options={[
+                    { label: 'Casual Leave (CL)', value: 'Casual Leave', desc: 'Standard casual personal leave (Max 12 days/yr)' },
+                    { label: 'Sick Leave (SL)', value: 'Sick Leave', desc: 'Medical and health-related leave (Max 10 days/yr)' },
+                    { label: 'Paid Annual Leave (PL)', value: 'Paid Leave', desc: 'Planned earned annual vacation (Max 15 days/yr)' },
+                    { label: 'Unpaid Leave (LWP)', value: 'Unpaid Leave', desc: 'Leave without pay authorization' }
+                  ]}
+                  icon={CalendarDays}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

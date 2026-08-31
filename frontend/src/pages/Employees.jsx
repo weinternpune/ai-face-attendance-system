@@ -229,6 +229,8 @@ export default function Employees() {
             options={deptOptions}
             placeholder="Filter by Department"
             icon={Filter}
+            size="sm"
+            isClearable={true}
           />
         </div>
       </div>

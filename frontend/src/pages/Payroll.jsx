@@ -16,8 +16,10 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Building2
 } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 
 export default function Payroll() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -65,14 +67,40 @@ export default function Payroll() {
 
   const employees = payrollData?.employees || [];
 
-  const departments = ['ALL', ...new Set(employees.map(e => e.department).filter(Boolean))];
+  const STANDARD_DEPARTMENTS = [
+    'ALL',
+    'AIML',
+    'Full Stack Development',
+    'Data Science',
+    'Engineering',
+    'Human Resources',
+    'Management',
+    'Marketing',
+    'Product',
+    'Design'
+  ];
+
+  const allDepartmentNames = Array.from(
+    new Set([...STANDARD_DEPARTMENTS, ...employees.map(e => e.department).filter(Boolean)])
+  );
+
+  const deptOptions = allDepartmentNames.map((dept) => {
+    const count = dept === 'ALL' 
+      ? employees.length 
+      : employees.filter(e => (e.department || '').trim().toLowerCase() === dept.trim().toLowerCase()).length;
+    return {
+      label: dept === 'ALL' ? 'All Departments' : dept,
+      value: dept,
+      badge: count
+    };
+  });
 
   const filteredEmployees = employees.filter((e) => {
     const matchesSearch = 
-      e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.department.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDept = deptFilter === 'ALL' || e.department === deptFilter;
+      (e.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (e.employee_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (e.department || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDept = deptFilter === 'ALL' || (e.department || '').trim().toLowerCase() === deptFilter.trim().toLowerCase();
     return matchesSearch && matchesDept;
   });
 
@@ -131,57 +159,57 @@ export default function Payroll() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Total Employees */}
-        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl border border-slate-800 space-y-2">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 hover:border-slate-700 space-y-2 shadow-xl group">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Total Staff</span>
-            <div className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300">
+            <div className="w-9 h-9 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-300 group-hover:scale-110 group-hover:bg-slate-700 transition duration-300 shadow-md">
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-white">{payrollData?.total_employees || 0}</div>
+          <div className="text-2xl sm:text-3xl font-black text-white group-hover:scale-[1.02] transition origin-left">{payrollData?.total_employees || 0}</div>
           <p className="text-[10px] sm:text-[11px] text-slate-400">Active payroll profiles</p>
         </div>
 
         {/* Total Working Hours */}
-        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl border border-emerald-500/20 space-y-2">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 hover:border-emerald-400/60 space-y-2 shadow-xl group">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-400">Hours Logged</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-500/25 transition duration-300 shadow-md shadow-emerald-500/10">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-emerald-400">{payrollData?.total_hours_logged || 0} hrs</div>
+          <div className="text-2xl sm:text-3xl font-black text-emerald-400 group-hover:scale-[1.02] transition origin-left">{payrollData?.total_hours_logged || 0} hrs</div>
           <p className="text-[10px] sm:text-[11px] text-emerald-400/80">Net productive hours</p>
         </div>
 
         {/* Total Overtime Hours */}
-        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl border border-amber-500/20 space-y-2">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/30 hover:border-amber-400/60 space-y-2 shadow-xl group">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">Overtime (OT)</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <div className="w-9 h-9 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 group-hover:bg-amber-500/25 transition duration-300 shadow-md shadow-amber-500/10">
               <Zap className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-amber-400">{payrollData?.total_overtime_hours || 0} hrs</div>
+          <div className="text-2xl sm:text-3xl font-black text-amber-400 group-hover:scale-[1.02] transition origin-left">{payrollData?.total_overtime_hours || 0} hrs</div>
           <p className="text-[10px] sm:text-[11px] text-amber-400/80">Accrued extra shift time</p>
         </div>
 
         {/* Working Days */}
-        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl border border-cyan-500/20 space-y-2">
+        <div className="glass-panel card-hover p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 border border-cyan-500/30 hover:border-cyan-400/60 space-y-2 shadow-xl group">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-400">Standard Base</span>
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+            <div className="w-9 h-9 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 group-hover:bg-cyan-500/25 transition duration-300 shadow-md shadow-cyan-500/10">
               <Calendar className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl sm:text-3xl font-black text-cyan-400">{payrollData?.standard_working_days || 26} Days</div>
+          <div className="text-2xl sm:text-3xl font-black text-cyan-400 group-hover:scale-[1.02] transition origin-left">{payrollData?.standard_working_days || 26} Days</div>
           <p className="text-[10px] sm:text-[11px] text-cyan-400/80">Monthly pay schedule</p>
         </div>
 
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 glass-panel p-4 rounded-2xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 glass-panel p-4 rounded-2xl border border-slate-800 relative z-30">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
@@ -193,17 +221,15 @@ export default function Payroll() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-semibold shrink-0">Dept:</span>
-          <select
+        <div className="w-full sm:w-64">
+          <CustomSelect
             value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-400 cursor-pointer"
-          >
-            {departments.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
+            onChange={(val) => setDeptFilter(val || 'ALL')}
+            options={deptOptions}
+            icon={Building2}
+            size="sm"
+            placeholder="Filter Department..."
+          />
         </div>
       </div>
 

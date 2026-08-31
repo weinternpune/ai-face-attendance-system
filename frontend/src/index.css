@@ -447,3 +447,56 @@ button, a {
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+button:active {
+  transform: scale(0.97);
+}
+
+/* Modal Pop Animation */
+@keyframes modal-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-pop {
+  animation: modal-pop 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Shimmer Loading & Highlight Effect */
+.shimmer-badge {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: skewX(-20deg);
+  animation: shimmer-sweep 3s infinite;
+}
+
+/* Responsive Table Scrollbar Wrapper */
+.table-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll-container::-webkit-scrollbar {
+  height: 4px;
+}
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+

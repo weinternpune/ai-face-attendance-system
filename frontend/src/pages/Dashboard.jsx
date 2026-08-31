@@ -226,72 +226,72 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 animate-fade-slide-up">
         
         {/* Total Staff */}
-        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden group">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden group bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 hover:border-slate-700">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Total Staff</span>
-            <div className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-300 group-hover:scale-110 transition">
+            <div className="w-9 h-9 rounded-2xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-300 group-hover:scale-110 group-hover:bg-slate-700 transition duration-300 shadow-md">
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl sm:text-4xl font-black text-white mt-3 tracking-tight">{stats.total_employees}</div>
+          <div className="text-3xl sm:text-4xl font-black text-white mt-3 tracking-tight group-hover:scale-[1.02] transition origin-left">{stats.total_employees}</div>
           <div className="text-[11px] text-slate-400 mt-1 font-medium flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Registered Personnel
           </div>
         </div>
 
         {/* Present */}
-        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-emerald-500/20 group">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden group bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/30 hover:border-emerald-400/60">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-emerald-400">Present</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition shadow-sm">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 group-hover:bg-emerald-500/25 transition duration-300 shadow-md shadow-emerald-500/10">
               <UserCheck className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl sm:text-4xl font-black text-emerald-400 mt-3 tracking-tight">{stats.present}</div>
+          <div className="text-3xl sm:text-4xl font-black text-emerald-400 mt-3 tracking-tight group-hover:scale-[1.02] transition origin-left">{stats.present}</div>
           <div className="text-[11px] text-emerald-400/90 mt-1 font-medium flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> Verified at Kiosk
           </div>
         </div>
 
         {/* Late */}
-        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-amber-500/20 group">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden group bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/30 hover:border-amber-400/60">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">Late Arrivals</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 transition shadow-sm">
+            <div className="w-9 h-9 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-110 group-hover:bg-amber-500/25 transition duration-300 shadow-md shadow-amber-500/10">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl sm:text-4xl font-black text-amber-400 mt-3 tracking-tight">{stats.late}</div>
+          <div className="text-3xl sm:text-4xl font-black text-amber-400 mt-3 tracking-tight group-hover:scale-[1.02] transition origin-left">{stats.late}</div>
           <div className="text-[11px] text-amber-400/90 mt-1 font-medium flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" /> After Shift Grace
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> After Shift Grace
           </div>
         </div>
 
         {/* Absent */}
-        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-rose-500/20 group">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden group bg-gradient-to-br from-rose-950/40 via-slate-900 to-slate-950 border border-rose-500/30 hover:border-rose-400/60">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-rose-400">Absent</span>
-            <div className="w-8 h-8 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:scale-110 transition shadow-sm">
+            <div className="w-9 h-9 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:scale-110 group-hover:bg-rose-500/25 transition duration-300 shadow-md shadow-rose-500/10">
               <UserX className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl sm:text-4xl font-black text-rose-400 mt-3 tracking-tight">{stats.absent}</div>
+          <div className="text-3xl sm:text-4xl font-black text-rose-400 mt-3 tracking-tight group-hover:scale-[1.02] transition origin-left">{stats.absent}</div>
           <div className="text-[11px] text-rose-400/90 mt-1 font-medium flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Not Checked In
           </div>
         </div>
 
         {/* On Leave */}
-        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden border-cyan-500/20 col-span-2 sm:col-span-1 group">
+        <div className="glass-panel card-hover rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden col-span-2 sm:col-span-1 group bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 border border-cyan-500/30 hover:border-cyan-400/60">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-cyan-400">On Leave</span>
-            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition shadow-sm">
+            <div className="w-9 h-9 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 group-hover:bg-cyan-500/25 transition duration-300 shadow-md shadow-cyan-500/10">
               <CalendarOff className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl sm:text-4xl font-black text-cyan-400 mt-3 tracking-tight">{stats.on_leave}</div>
+          <div className="text-3xl sm:text-4xl font-black text-cyan-400 mt-3 tracking-tight group-hover:scale-[1.02] transition origin-left">{stats.on_leave || 0}</div>
           <div className="text-[11px] text-cyan-400/90 mt-1 font-medium flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> Approved Leaves
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> Authorized Absence
           </div>
         </div>
 

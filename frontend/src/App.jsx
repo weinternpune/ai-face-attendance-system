@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 import Kiosk from './pages/Kiosk';
 import Dashboard from './pages/Dashboard';
 import Enrollment from './pages/Enrollment';
@@ -68,6 +69,7 @@ function Layout({ children }) {
       <main className="flex-1 w-full animate-fadeIn transition-opacity duration-300">
         {children}
       </main>
+      {!isFullscreen && <Footer />}
     </div>
   );
 }
