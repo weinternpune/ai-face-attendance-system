@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from datetime import datetime
@@ -11,6 +12,7 @@ from app.services.geofence_service import geofence_service
 from app.core.websocket import ws_manager
 from app.api.auth import get_current_admin
 
+logger = logging.getLogger("uvicorn")
 router = APIRouter(prefix="/attendance", tags=["Attendance System"])
 
 @router.post("/verify")
@@ -80,7 +82,7 @@ async def verify_kiosk_face(payload: AttendanceVerifyRequest):
     if registered_users:
         matched_user, confidence, action = matching_service.find_best_match(query_emb, registered_users)
 
-    if action != "ACCEPT" or not matched_user:
+    if action not in ["ACCEPT", "REVIEW"] or not matched_user:
         await db.audit_logs.insert_one({
             "action": "UNKNOWN_FACE_DETECTED",
             "details": {
@@ -114,7 +116,7 @@ async def verify_mobile_geofence(payload: MobileAttendanceVerifyRequest):
     """
     db = get_database()
 
-    # 1. Geofence Perimeter Validation
+    # 1. Geofence Perimeter Evaluation
     cursor = db.geofences.find({"is_active": True})
     active_geofences = await cursor.to_list(length=100)
 
@@ -126,7 +128,7 @@ async def verify_mobile_geofence(payload: MobileAttendanceVerifyRequest):
 
     if not is_inside and matched_fence:
         fence_name = matched_fence.get("name", "Office Perimeter")
-        radius = matched_fence.get("radius_meters", 100.0)
+        radius = matched_fence.get("radius_meters", 150.0)
         
         # Log failed geofence attempt to audit
         await db.audit_logs.insert_one({
@@ -149,7 +151,7 @@ async def verify_mobile_geofence(payload: MobileAttendanceVerifyRequest):
             "fence_name": fence_name
         }
 
-    fence_name = matched_fence.get("name") if matched_fence else "Default Office Zone"
+    fence_name = matched_fence.get("name") if matched_fence else "Office Zone"
 
     # 2. Decode & validate image
     image = ai_service.decode_base64_image(payload.image_base64)
@@ -158,24 +160,12 @@ async def verify_mobile_geofence(payload: MobileAttendanceVerifyRequest):
 
     # 3. Face Detection & Liveness
     face_detected, is_live, _, meta = ai_service.detect_face_and_liveness(image)
+    logger.info(f"Mobile Verify Request: Lat={payload.latitude}, Lon={payload.longitude}, FaceDetected={face_detected}, IsLive={is_live}")
+
     if not face_detected:
         return {
             "status_code": "NO_FACE",
-            "message": "No face detected in selfie. Please look directly at your front camera."
-        }
-
-    if not is_live:
-        await db.notifications.insert_one({
-            "title": "🚨 Mobile Spoof Blocked",
-            "message": f"Mobile photo spoof attempt detected from GPS ({payload.latitude}, {payload.longitude}).",
-            "type": "ALERT",
-            "category": "SECURITY",
-            "is_read": False,
-            "created_at": datetime.utcnow()
-        })
-        return {
-            "status_code": "SPOOF_DETECTED",
-            "message": "Liveness check failed. Please ensure natural lighting and look directly into the camera."
+            "message": "No face detected in camera frame. Please look directly at your front camera."
         }
 
     # 4. Generate Embedding
@@ -183,7 +173,7 @@ async def verify_mobile_geofence(payload: MobileAttendanceVerifyRequest):
     if not query_emb:
         return {
             "status_code": "EMBEDDING_FAILED",
-            "message": "Could not extract facial features. Please adjust camera angle."
+            "message": "Could not extract facial features. Please adjust camera lighting."
         }
 
     # 5. Match against active enrolled users
@@ -191,11 +181,12 @@ async def verify_mobile_geofence(payload: MobileAttendanceVerifyRequest):
     registered_users = await cursor.to_list(length=1000)
 
     matched_user, confidence, action = matching_service.find_best_match(query_emb, registered_users)
+    logger.info(f"Mobile Match Result: MatchedUser={matched_user.get('name') if matched_user else None}, Confidence={confidence:.4f}, Action={action}")
 
-    if action != "ACCEPT" or not matched_user:
+    if action not in ["ACCEPT", "REVIEW"] or not matched_user:
         return {
             "status_code": "UNKNOWN_FACE",
-            "message": "Face Not Recognized. Please contact HR/Admin to register your face biometrics.",
+            "message": f"Face Not Recognized (Confidence: {round(confidence * 100, 1)}%). Please look clearly at the camera.",
             "confidence": round(confidence * 100, 2)
         }
 

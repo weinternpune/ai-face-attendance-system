@@ -63,9 +63,8 @@ export default function Dashboard() {
     fetchDashboardData();
 
     // Determine WS URL
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    const baseUrl = apiUrl.replace(/^http/, 'ws').replace(/\/api\/?$/, '');
-    const wsUrl = `${baseUrl}/ws/attendance`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/attendance`;
 
     let socket;
     try {

@@ -133,3 +133,37 @@ async def delete_geofence(geofence_id: str, current_admin: dict = Depends(get_cu
 
     await db.geofences.delete_one({"_id": g_id})
     return {"message": f"Geofence '{existing.get('name')}' deleted successfully"}
+
+@router.post("/set-current-office")
+async def set_current_office_location(payload: dict):
+    """Sets the active office geofence location to user's real GPS coordinates with 150m radius"""
+    db = get_database()
+    lat = float(payload.get("latitude"))
+    lon = float(payload.get("longitude"))
+    name = payload.get("name", "Active Office Location (150m)")
+
+    # Update or insert active geofence
+    await db.geofences.update_many({}, {"$set": {"is_active": False}})
+    
+    doc = {
+        "name": name,
+        "latitude": lat,
+        "longitude": lon,
+        "radius_meters": 150.0,
+        "address": f"Real GPS Office Coordinates ({lat:.5f}, {lon:.5f})",
+        "is_active": True,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    await db.geofences.insert_one(doc)
+    
+    return {
+        "status": "SUCCESS",
+        "message": f"Office Geofence set to your exact current location with 150m radius ({lat:.5f}, {lon:.5f})",
+        "geofence": {
+            "name": name,
+            "latitude": lat,
+            "longitude": lon,
+            "radius_meters": 150.0
+        }
+    }

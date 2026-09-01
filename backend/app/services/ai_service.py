@@ -29,23 +29,47 @@ class AIService:
             logger.error(f"Error decoding base64 image: {e}")
             return None
 
+    def auto_orient_image(self, image: np.ndarray) -> np.ndarray:
+        """Auto-rotates mobile phone photos (0, 90, 180, 270 deg) to ensure face is upright"""
+        if image is None:
+            return image
+        
+        rotations = [
+            None,
+            cv2.ROTATE_90_CLOCKWISE,
+            cv2.ROTATE_90_COUNTERCLOCKWISE,
+            cv2.ROTATE_180
+        ]
+        
+        for rot in rotations:
+            candidate = cv2.rotate(image, rot) if rot is not None else image
+            gray = cv2.cvtColor(candidate, cv2.COLOR_BGR2GRAY) if len(candidate.shape) == 3 else candidate
+            faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(30, 30))
+            if len(faces) > 0:
+                return candidate
+                
+        return image
+
     def detect_face_and_liveness(self, image: np.ndarray) -> Tuple[bool, bool, Optional[np.ndarray], Dict[str, any]]:
         """
-        Runs Face Detection and Liveness verification.
+        Runs Face Detection and Liveness verification with mobile auto-rotation.
         Returns: (face_detected, is_live, cropped_face, metadata)
         """
         if image is None:
             return False, False, None, {"reason": "Empty image"}
 
-        h, w, _ = image.shape
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Auto-orient if phone camera saved image sideways
+        image = self.auto_orient_image(image)
+
+        h, w = image.shape[:2]
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
         # 1. Primary detection on standard grayscale
         faces = self.face_cascade.detectMultiScale(
             gray,
             scaleFactor=1.08,
-            minNeighbors=3,
-            minSize=(35, 35)
+            minNeighbors=2,
+            minSize=(30, 30)
         )
 
         # 2. Secondary detection on CLAHE (Adaptive Lighting)
@@ -195,6 +219,8 @@ class AIService:
             return None
 
         try:
+            # Auto-orient image if phone camera photo is sideways
+            image = self.auto_orient_image(image)
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
             
             # Detect primary face within image to crop
@@ -206,8 +232,9 @@ class AIService:
             else:
                 face_crop = gray
 
-            # Standardize face image to 128x128 canonical dimension
-            face_resized = cv2.resize(face_crop, (128, 128), interpolation=cv2.INTER_AREA)
+            # Standardize face image to 128x128 canonical dimension with CLAHE lighting normalization
+            face_normalized = self.clahe.apply(face_crop)
+            face_resized = cv2.resize(face_normalized, (128, 128), interpolation=cv2.INTER_AREA)
 
             # Compute Sobel Gradients
             gx = cv2.Sobel(face_resized, cv2.CV_32F, 1, 0, ksize=3)

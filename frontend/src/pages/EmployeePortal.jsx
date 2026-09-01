@@ -350,7 +350,13 @@ export default function EmployeePortal() {
                     <td className="px-6 py-4 font-mono text-emerald-400 font-semibold">{rec.entry_time}</td>
                     <td className="px-6 py-4 font-mono text-slate-300">{rec.exit_time || '—'}</td>
                     <td className="px-6 py-4 font-mono font-bold text-white">
-                      {rec.working_hours > 0 ? `${rec.working_hours} hrs` : rec.work_duration || 'In Progress'}
+                      {rec.working_hours > 0 ? (
+                        <span className="text-white font-mono">{rec.working_hours} hrs</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" /> Shift In Progress
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${

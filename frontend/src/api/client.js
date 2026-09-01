@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -27,7 +28,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // Clear token if expired
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/kiosk') {
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/kiosk' && window.location.pathname !== '/mobile-checkin') {
         localStorage.removeItem('weintern_token');
         localStorage.removeItem('weintern_user');
       }
