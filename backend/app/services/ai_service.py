@@ -223,14 +223,31 @@ class AIService:
             image = self.auto_orient_image(image)
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
             
-            # Detect primary face within image to crop
+            # Multi-stage Face Detection within query image
             faces = self.face_cascade.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=2, minSize=(30, 30))
+            if len(faces) == 0:
+                gray_clahe = self.clahe.apply(gray)
+                faces = self.face_cascade.detectMultiScale(gray_clahe, scaleFactor=1.08, minNeighbors=2, minSize=(30, 30))
+            if len(faces) == 0:
+                faces = self.face_cascade_alt.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=2, minSize=(30, 30))
+
             if len(faces) > 0:
                 faces_sorted = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
                 (x, y, fw, fh) = faces_sorted[0]
-                face_crop = gray[y:y+fh, x:x+fw]
+                # Add 10% bounding box padding
+                pad_x = int(fw * 0.10)
+                pad_y = int(fh * 0.10)
+                ymin = max(0, y - pad_y)
+                xmin = max(0, x - pad_x)
+                ymax = min(gray.shape[0], y + fh + pad_y)
+                xmax = min(gray.shape[1], x + fw + pad_x)
+                face_crop = gray[ymin:ymax, xmin:xmax]
             else:
-                face_crop = gray
+                # Center ROI fallback
+                ch, cw = gray.shape[:2]
+                cy, cx = ch // 2, cw // 2
+                box_sz = int(min(ch, cw) * 0.65)
+                face_crop = gray[max(0, cy - box_sz // 2):min(ch, cy + box_sz // 2), max(0, cx - box_sz // 2):min(cw, cx + box_sz // 2)]
 
             # Standardize face image to 128x128 canonical dimension with CLAHE lighting normalization
             face_normalized = self.clahe.apply(face_crop)

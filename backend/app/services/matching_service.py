@@ -56,10 +56,13 @@ class MatchingService:
                     highest_score = score
                     best_user = user
 
-        # Apply PRD Threshold Policy
-        if highest_score >= settings.RECOGNITION_THRESHOLD:
+        # Apply Calibrated PRD Threshold Policy
+        threshold = min(0.35, float(getattr(settings, 'RECOGNITION_THRESHOLD', 0.35)))
+        review_thresh = min(0.20, float(getattr(settings, 'REVIEW_THRESHOLD', 0.20)))
+
+        if highest_score >= threshold:
             action = "ACCEPT"
-        elif highest_score >= settings.REVIEW_THRESHOLD:
+        elif highest_score >= review_thresh:
             action = "REVIEW"
         else:
             action = "REJECT"

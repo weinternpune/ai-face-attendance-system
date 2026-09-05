@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import apiClient from '../api/client';
 import { 
   MapPin, 
@@ -230,7 +231,7 @@ export default function MobileCheckin() {
     return () => stopCamera();
   }, []);
 
-  // Submit base64 attendance with Dual-Redundant Fallback
+  // Submit base64 attendance with Triple-Layer High Reliability Fallback
   const submitAttendance = async (base64Image) => {
     const activeFence = geofences.length > 0 ? geofences[0] : null;
     const lat = userLocation ? userLocation.latitude : (activeFence ? activeFence.latitude : 18.56177);
@@ -239,30 +240,44 @@ export default function MobileCheckin() {
     setVerifying(true);
     setVerifyResult(null);
 
-    try {
-      const payload = {
-        image_base64: base64Image,
-        latitude: lat,
-        longitude: lon,
-        device_id: 'MOBILE_PWA_CLIENT'
-      };
+    const payload = {
+      image_base64: base64Image,
+      latitude: lat,
+      longitude: lon,
+      device_id: 'MOBILE_PWA_CLIENT'
+    };
 
+    // 1. Try Vite Reverse Proxy
+    try {
       const res = await apiClient.post('/attendance/mobile-verify', payload);
       setVerifyResult(res.data);
-    } catch (err) {
-      console.warn('Primary mobile verify failed, triggering direct Kiosk verify engine...', err);
-      try {
-        const fallbackRes = await apiClient.post('/attendance/verify', {
-          image_base64: base64Image,
-          device_id: 'MOBILE_PWA_CLIENT'
-        });
-        setVerifyResult(fallbackRes.data);
-      } catch (fallbackErr) {
-        setVerifyResult({
-          status_code: 'ERROR',
-          message: err.response?.data?.detail || err.message || 'Connection error. Please retry.'
-        });
-      }
+      return;
+    } catch (proxyErr) {
+      console.warn('Vite proxy attempt failed, trying direct backend IP...', proxyErr);
+    }
+
+    // 2. Try Direct Backend IP on Port 8000
+    try {
+      const directHost = window.location.hostname || 'localhost';
+      const directRes = await axios.post(`http://${directHost}:8000/api/attendance/mobile-verify`, payload, { timeout: 15000 });
+      setVerifyResult(directRes.data);
+      return;
+    } catch (directErr) {
+      console.warn('Direct backend attempt failed, trying Kiosk verify...', directErr);
+    }
+
+    // 3. Try Kiosk Verify Endpoint
+    try {
+      const kioskRes = await apiClient.post('/attendance/verify', {
+        image_base64: base64Image,
+        device_id: 'MOBILE_PWA_CLIENT'
+      });
+      setVerifyResult(kioskRes.data);
+    } catch (finalErr) {
+      setVerifyResult({
+        status_code: 'ERROR',
+        message: finalErr.response?.data?.detail || finalErr.message || 'Connection error. Please ensure backend is running.'
+      });
     } finally {
       setVerifying(false);
     }

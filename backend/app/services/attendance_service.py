@@ -131,10 +131,10 @@ class AttendanceService:
         if existing_record:
             entry_time = existing_record.get("entry_time")
             created_at = existing_record.get("created_at")
-            seconds_since_entry = (datetime.utcnow() - created_at).total_seconds() if created_at else 100
+            # Minimum 30 minutes (1800 seconds) required between Punch-In and Punch-Out (Exit)
+            MIN_CHECKOUT_INTERVAL_SECONDS = 1800  # 30 minutes
 
-            # If punch_action is CHECKOUT or if scan occurred after at least 30 seconds (or already has entry)
-            if punch_action == "CHECKOUT" or seconds_since_entry > 30:
+            if punch_action == "CHECKOUT" or seconds_since_entry >= MIN_CHECKOUT_INTERVAL_SECONDS:
                 working_hours, ot_hours, duration_status = self.calculate_work_duration(
                     entry_time, 
                     current_time, 
@@ -180,10 +180,11 @@ class AttendanceService:
 
                 return checkout_payload
 
-            # Otherwise (immediate duplicate scan within 30s)
+            # Scan within 30 minutes of In-Time: Return duplicate scan notice
+            remaining_mins = max(1, round((MIN_CHECKOUT_INTERVAL_SECONDS - seconds_since_entry) / 60))
             res = {
                 "status_code": "ALREADY_MARKED",
-                "message": "Attendance already marked for today",
+                "message": f"Attendance already marked at {entry_time}. Exit punch available after 30 mins (in {remaining_mins}m).",
                 "user": {
                     "id": user_id_str,
                     "name": user["name"],

@@ -249,12 +249,12 @@ export default function EmployeePortal() {
             <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80 space-y-1">
               <span className="text-[11px] font-semibold text-slate-400 block">Casual Leave (CL)</span>
               <div className="text-xl font-black text-white">
-                {leavesData?.balances?.casual_leave?.remaining || 12} <span className="text-xs font-normal text-slate-400">/ 12 left</span>
+                {leavesData?.balances?.casual_leave?.remaining ?? 12} <span className="text-xs font-normal text-slate-400">/ 12 left</span>
               </div>
               <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-2">
                 <div 
-                  className="bg-amber-400 h-full rounded-full" 
-                  style={{ width: `${((leavesData?.balances?.casual_leave?.remaining || 12) / 12) * 100}%` }}
+                  className="bg-amber-400 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${((leavesData?.balances?.casual_leave?.remaining ?? 12) / 12) * 100}%` }}
                 />
               </div>
             </div>
@@ -263,12 +263,12 @@ export default function EmployeePortal() {
             <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80 space-y-1">
               <span className="text-[11px] font-semibold text-slate-400 block">Sick Leave (SL)</span>
               <div className="text-xl font-black text-white">
-                {leavesData?.balances?.sick_leave?.remaining || 10} <span className="text-xs font-normal text-slate-400">/ 10 left</span>
+                {leavesData?.balances?.sick_leave?.remaining ?? 10} <span className="text-xs font-normal text-slate-400">/ 10 left</span>
               </div>
               <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-2">
                 <div 
-                  className="bg-emerald-400 h-full rounded-full" 
-                  style={{ width: `${((leavesData?.balances?.sick_leave?.remaining || 10) / 10) * 100}%` }}
+                  className="bg-emerald-400 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${((leavesData?.balances?.sick_leave?.remaining ?? 10) / 10) * 100}%` }}
                 />
               </div>
             </div>
@@ -277,12 +277,12 @@ export default function EmployeePortal() {
             <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80 space-y-1">
               <span className="text-[11px] font-semibold text-slate-400 block">Paid Annual Leave (PL)</span>
               <div className="text-xl font-black text-white">
-                {leavesData?.balances?.paid_leave?.remaining || 15} <span className="text-xs font-normal text-slate-400">/ 15 left</span>
+                {leavesData?.balances?.paid_leave?.remaining ?? 15} <span className="text-xs font-normal text-slate-400">/ 15 left</span>
               </div>
               <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-2">
                 <div 
-                  className="bg-cyan-400 h-full rounded-full" 
-                  style={{ width: `${((leavesData?.balances?.paid_leave?.remaining || 15) / 15) * 100}%` }}
+                  className="bg-cyan-400 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${((leavesData?.balances?.paid_leave?.remaining ?? 15) / 15) * 100}%` }}
                 />
               </div>
             </div>
@@ -371,6 +371,76 @@ export default function EmployeePortal() {
                     </td>
                     <td className="px-6 py-4 text-slate-400 text-[11px]">
                       {rec.verification_mode || 'KIOSK'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* My Leave Applications & Approval Status Table */}
+      <div className="glass-panel rounded-3xl border border-slate-800 shadow-2xl overflow-hidden space-y-0">
+        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-amber-400" /> My Leave Requests & Live Approval Status
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">Track whether HR/Admin has Approved, Rejected, or is Reviewing your time-off</p>
+          </div>
+          <button
+            onClick={() => setApplyModalOpen(true)}
+            className="btn-primary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" /> New Request
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-300 min-w-[650px]">
+            <thead className="bg-slate-950/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+              <tr>
+                <th className="px-6 py-3.5">Category</th>
+                <th className="px-6 py-3.5">Dates / Period</th>
+                <th className="px-6 py-3.5">Reason</th>
+                <th className="px-6 py-3.5">Approval Status</th>
+                <th className="px-6 py-3.5">HR / Admin Remarks</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60 font-medium">
+              {!leavesData?.leaves || leavesData.leaves.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-8 text-center text-slate-400">
+                    No leave applications submitted yet. Click "New Request" above to apply.
+                  </td>
+                </tr>
+              ) : (
+                leavesData.leaves.map((l) => (
+                  <tr key={l.id} className="hover:bg-slate-850/60 transition">
+                    <td className="px-6 py-4 font-bold text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400" />
+                      {l.leave_type}
+                    </td>
+                    <td className="px-6 py-4 font-mono text-slate-200">
+                      {l.start_date} <span className="text-slate-500">→</span> {l.end_date}
+                    </td>
+                    <td className="px-6 py-4 text-slate-300 max-w-xs truncate" title={l.reason}>
+                      {l.reason}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold border ${
+                        l.status === 'Approved'
+                          ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/30'
+                          : l.status === 'Rejected'
+                          ? 'bg-rose-400/10 text-rose-400 border-rose-400/30'
+                          : 'bg-amber-400/10 text-amber-400 border-amber-400/30 animate-pulse'
+                      }`}>
+                        {l.status === 'Approved' ? '✅ Approved' : l.status === 'Rejected' ? '❌ Rejected' : '⏳ Pending Review'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-400 text-xs italic">
+                      {l.admin_remarks || (l.status === 'Pending' ? 'Under Review' : '—')}
                     </td>
                   </tr>
                 ))
