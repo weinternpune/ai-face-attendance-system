@@ -85,12 +85,12 @@ async def lifespan(app: FastAPI):
     existing_shifts = await db.shifts.count_documents({})
     if existing_shifts == 0:
         default_shifts = [
-            {"name": "General Shift", "code": "GEN", "start_time": "09:00", "end_time": "18:00", "grace_period_minutes": 30, "late_threshold_minutes": 45, "description": "Standard 9 AM to 6 PM (30 min grace)", "is_default": True, "created_at": datetime.utcnow()},
+            {"name": "General Shift", "code": "GEN", "start_time": "10:00", "end_time": "19:00", "grace_period_minutes": 30, "late_threshold_minutes": 45, "description": "Standard 10 AM to 7 PM (30 min grace)", "is_default": True, "created_at": datetime.utcnow()},
             {"name": "Morning Shift", "code": "MOR", "start_time": "07:00", "end_time": "16:00", "grace_period_minutes": 15, "late_threshold_minutes": 30, "description": "Early morning 7 AM to 4 PM", "is_default": False, "created_at": datetime.utcnow()},
             {"name": "Evening Shift", "code": "EVE", "start_time": "14:00", "end_time": "23:00", "grace_period_minutes": 15, "late_threshold_minutes": 30, "description": "Afternoon to night 2 PM to 11 PM", "is_default": False, "created_at": datetime.utcnow()},
         ]
         await db.shifts.insert_many(default_shifts)
-        logger.info("Initialized default work shifts (General, Morning, Evening).")
+        logger.info("Initialized default work shifts (General 10 AM-7 PM, Morning, Evening).")
 
     # Auto-seed default office geofence if empty
     existing_geofences = await db.geofences.count_documents({})
