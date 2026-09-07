@@ -19,7 +19,12 @@ import {
   WifiOff, 
   Calendar, 
   Layers, 
-  ArrowRight 
+  ArrowRight,
+  Mail,
+  Send,
+  BellRing,
+  History,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -41,6 +46,18 @@ export default function Dashboard() {
   const [wsConnected, setWsConnected] = useState(false);
   const [lastLiveEvent, setLastLiveEvent] = useState(null);
   const wsRef = useRef(null);
+
+  // Automated Alerts & Digest States
+  const [digestSending, setDigestSending] = useState(false);
+  const [digestFeedback, setDigestFeedback] = useState(null);
+  const [alertModalOpen, setAlertModalOpen] = useState(false);
+  const [selectedAlertEmp, setSelectedAlertEmp] = useState(null);
+  const [alertType, setAlertType] = useState('LATE_NOTICE');
+  const [customAlertMsg, setCustomAlertMsg] = useState('');
+  const [alertSending, setAlertSending] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [alertHistory, setAlertHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -147,6 +164,73 @@ export default function Dashboard() {
     }
   };
 
+  // Automated Digest & Alert Handlers
+  const handleSendDailyDigest = async () => {
+    setDigestSending(true);
+    setDigestFeedback(null);
+    try {
+      const res = await apiClient.post('/alerts/send-daily-digest');
+      setDigestFeedback({
+        type: 'success',
+        msg: `Daily Digest sent to HR! Turnout: ${res.data.digest?.metrics?.turnout_percentage}% (${res.data.digest?.metrics?.present}/${res.data.digest?.metrics?.total_staff} Staff)`
+      });
+      fetchDashboardData();
+    } catch (err) {
+      setDigestFeedback({
+        type: 'error',
+        msg: err.response?.data?.detail || 'Failed to trigger daily digest'
+      });
+    } finally {
+      setDigestSending(false);
+      setTimeout(() => setDigestFeedback(null), 8000);
+    }
+  };
+
+  const handleOpenAlertModal = (record) => {
+    setSelectedAlertEmp(record);
+    const defaultType = record.status === 'Late' ? 'LATE_NOTICE' : record.status === 'Absent' ? 'ABSENT_NOTICE' : 'CUSTOM';
+    setAlertType(defaultType);
+    setCustomAlertMsg('');
+    setAlertModalOpen(true);
+  };
+
+  const handleSubmitEmployeeAlert = async (e) => {
+    e.preventDefault();
+    if (!selectedAlertEmp) return;
+    setAlertSending(true);
+    try {
+      await apiClient.post('/alerts/send-employee-alert', {
+        employee_id: selectedAlertEmp.employee_id,
+        alert_type: alertType,
+        custom_message: customAlertMsg || undefined
+      });
+      setAlertModalOpen(false);
+      setDigestFeedback({
+        type: 'success',
+        msg: `Attendance alert successfully dispatched to ${selectedAlertEmp.employee_name} (${selectedAlertEmp.employee_id})!`
+      });
+      fetchDashboardData();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to dispatch employee alert');
+    } finally {
+      setAlertSending(false);
+      setTimeout(() => setDigestFeedback(null), 8000);
+    }
+  };
+
+  const handleOpenHistory = async () => {
+    setHistoryModalOpen(true);
+    setHistoryLoading(true);
+    try {
+      const res = await apiClient.get('/alerts/history?limit=30');
+      setAlertHistory(res.data);
+    } catch (err) {
+      console.error('Failed to load alert history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const filteredRecords = attendanceRecords.filter((r) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -186,7 +270,7 @@ export default function Dashboard() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto flex-wrap">
           <button
             onClick={fetchDashboardData}
             title="Refresh Table"
@@ -196,13 +280,50 @@ export default function Dashboard() {
           </button>
 
           <button
-            onClick={handleExportCSV}
-            className="btn-primary flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl cursor-pointer"
+            onClick={handleOpenHistory}
+            title="View Automated Alerts & Notices History"
+            className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 rounded-2xl text-xs sm:text-sm font-bold transition cursor-pointer"
           >
-            <Download className="w-4 h-4 stroke-[2.5]" /> Export Daily CSV
+            <History className="w-4 h-4 text-amber-400" />
+            <span className="hidden md:inline">Alerts Log</span>
+          </button>
+
+          <button
+            onClick={handleSendDailyDigest}
+            disabled={digestSending}
+            title="Send Daily Attendance Summary to HR via Email"
+            className="flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-2xl text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition cursor-pointer disabled:opacity-50"
+          >
+            <Mail className={`w-4 h-4 ${digestSending ? 'animate-bounce' : ''}`} />
+            <span>{digestSending ? 'Sending...' : 'Send Daily Digest'}</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="btn-primary flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm rounded-2xl cursor-pointer"
+          >
+            <Download className="w-4 h-4 stroke-[2.5]" /> 
+            <span className="hidden sm:inline">Export</span> CSV
           </button>
         </div>
       </div>
+
+      {/* Digest & Alert Feedback Toast */}
+      {digestFeedback && (
+        <div className={`p-4 rounded-2xl border shadow-lg flex items-center justify-between gap-3 animate-spring-in ${
+          digestFeedback.type === 'success' 
+            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+            : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+        }`}>
+          <div className="flex items-center gap-2.5 text-xs sm:text-sm font-bold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{digestFeedback.msg}</span>
+          </div>
+          <button onClick={() => setDigestFeedback(null)} className="text-slate-400 hover:text-white p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Live Punch Alert Toast when WebSocket event fires */}
       {lastLiveEvent && (
@@ -446,12 +567,22 @@ export default function Dashboard() {
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <button
-                        onClick={() => handleOpenCorrection(r)}
-                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-xl transition border border-slate-800 cursor-pointer"
-                      >
-                        Override
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5 sm:gap-2">
+                        <button
+                          onClick={() => handleOpenAlertModal(r)}
+                          title="Send Attendance Notice (Email / Alert)"
+                          className="px-2.5 sm:px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-bold text-xs rounded-xl transition border border-amber-500/30 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Send className="w-3 h-3" />
+                          <span className="hidden sm:inline">Notice</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenCorrection(r)}
+                          className="px-2.5 sm:px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-xs rounded-xl transition border border-slate-800 cursor-pointer"
+                        >
+                          Override
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -460,6 +591,151 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Send Employee Notice Modal */}
+      {alertModalOpen && selectedAlertEmp && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 w-full max-w-md rounded-3xl border border-slate-800 p-5 sm:p-7 space-y-4 shadow-2xl animate-spring-in my-auto max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <BellRing className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" /> Send Attendance Notice
+              </h3>
+              <button onClick={() => setAlertModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Employee:</span>
+                <span className="text-white font-bold">{selectedAlertEmp.employee_name} ({selectedAlertEmp.employee_id})</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Today's Status:</span>
+                <span className={`font-bold font-mono ${selectedAlertEmp.status === 'Late' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {selectedAlertEmp.status || 'Present'} ({selectedAlertEmp.entry_time || 'N/A'})
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Dispatch Channel:</span>
+                <span className="text-cyan-400 font-mono font-bold text-[11px]">Email + In-App Notification</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmitEmployeeAlert} className="space-y-4 text-xs">
+              <CustomSelect
+                label="Notice Type *"
+                value={alertType}
+                onChange={(val) => setAlertType(val)}
+                options={[
+                  { label: 'Late Arrival Notice', value: 'LATE_NOTICE', desc: 'Alert regarding clock-in past shift grace time' },
+                  { label: 'Absent Warning Notice', value: 'ABSENT_NOTICE', desc: 'Alert for missing kiosk/mobile check-in' },
+                  { label: 'Custom Official Memo', value: 'CUSTOM', desc: 'Send a custom note or attendance announcement' }
+                ]}
+              />
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5">Custom Message (Optional)</label>
+                <textarea
+                  rows="3"
+                  placeholder="Leave blank for system auto-generated template, or enter specific instructions..."
+                  value={customAlertMsg}
+                  onChange={(e) => setCustomAlertMsg(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-white focus:outline-none focus:border-amber-400 shadow-inner placeholder-slate-600"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAlertModalOpen(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={alertSending}
+                  className="btn-primary px-5 py-2 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {alertSending ? 'Dispatching...' : 'Dispatch Alert'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Alerts & Digest History Modal */}
+      {historyModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-800 p-5 sm:p-7 space-y-4 shadow-2xl animate-spring-in my-auto max-h-[92vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <History className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" /> Automated Communications Log
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Audit log of all dispatched digests, late notices, and employee alerts</p>
+              </div>
+              <button onClick={() => setHistoryModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto max-h-[60vh] space-y-2.5 pr-1 text-xs">
+              {historyLoading ? (
+                <div className="text-center py-12 text-slate-400">
+                  <div className="inline-block animate-spin w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full mb-2" />
+                  <p>Loading alerts log from database...</p>
+                </div>
+              ) : alertHistory.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <Mail className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+                  <p className="font-semibold text-slate-300">No alerts or digests dispatched yet</p>
+                  <p className="text-xs mt-0.5">Use "Send Daily Digest" or "Notice" to send alerts.</p>
+                </div>
+              ) : (
+                alertHistory.map((item) => (
+                  <div key={item.id} className="bg-slate-950 p-3.5 rounded-2xl border border-slate-800/80 space-y-1.5 hover:border-slate-700 transition">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] uppercase font-mono ${
+                          item.alert_type === 'EMAIL_DIGEST' 
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                            : item.alert_type === 'LATE_NOTICE'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}>
+                          {item.alert_type}
+                        </span>
+                        <span className="font-bold text-white text-xs">{item.recipient}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A'}
+                      </span>
+                    </div>
+                    <p className="text-slate-300 text-xs leading-snug">{item.message}</p>
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-900">
+                      <span>Status: <strong className="text-emerald-400">{item.status}</strong></span>
+                      <span>Channel: <strong className="text-slate-400 font-mono">Email / WhatsApp</strong></span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-800">
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manual Correction Modal */}
       {correctionModalOpen && selectedRecord && (

@@ -134,6 +134,14 @@ class AttendanceService:
             # Minimum 30 minutes (1800 seconds) required between Punch-In and Punch-Out (Exit)
             MIN_CHECKOUT_INTERVAL_SECONDS = 1800  # 30 minutes
 
+            seconds_since_entry = 0
+            if created_at:
+                seconds_since_entry = (datetime.utcnow() - created_at).total_seconds()
+            elif entry_time:
+                entry_dt = self.parse_time_str(entry_time, today_date)
+                if entry_dt:
+                    seconds_since_entry = (now_dt - entry_dt).total_seconds()
+
             if punch_action == "CHECKOUT" or seconds_since_entry >= MIN_CHECKOUT_INTERVAL_SECONDS:
                 working_hours, ot_hours, duration_status = self.calculate_work_duration(
                     entry_time, 
