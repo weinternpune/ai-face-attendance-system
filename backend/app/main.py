@@ -42,6 +42,7 @@ async def lifespan(app: FastAPI):
     # Auto-seed default demo employee
     existing_employee = await db.users.find_one({"email": "employee@weintern.com"})
     if not existing_employee:
+        default_emp_pass = os.getenv("DEFAULT_STAFF_PASSWORD", "weintern_staff_demo")
         emp_doc = {
             "name": "Demo Staff Member",
             "employee_id": "EMP101",
@@ -53,16 +54,17 @@ async def lifespan(app: FastAPI):
             "employee_type": "Full-Time",
             "shift_name": "General Shift",
             "status": "Active",
-            "hashed_password": get_password_hash("weintern@123"),
+            "hashed_password": get_password_hash(default_emp_pass),
             "face_embeddings": [],
             "created_at": datetime.utcnow()
         }
         await db.users.insert_one(emp_doc)
-        logger.info("Initialized default Demo Employee account: employee@weintern.com (pwd: weintern@123)")
+        logger.info("Initialized default Demo Employee account")
 
     # Auto-seed default HR account
     existing_hr = await db.users.find_one({"email": "hr@weintern.com"})
     if not existing_hr:
+        default_hr_pass = os.getenv("DEFAULT_HR_PASSWORD", "weintern_hr_demo")
         hr_doc = {
             "name": "HR Operations Lead",
             "employee_id": "HR001",
@@ -74,12 +76,12 @@ async def lifespan(app: FastAPI):
             "employee_type": "Full-Time",
             "shift_name": "General Shift",
             "status": "Active",
-            "hashed_password": get_password_hash("hr@weintern123"),
+            "hashed_password": get_password_hash(default_hr_pass),
             "face_embeddings": [],
             "created_at": datetime.utcnow()
         }
         await db.users.insert_one(hr_doc)
-        logger.info("Initialized default HR account: hr@weintern.com (pwd: hr@weintern123)")
+        logger.info("Initialized default HR account")
 
     # Auto-seed default shifts if empty
     existing_shifts = await db.shifts.count_documents({})

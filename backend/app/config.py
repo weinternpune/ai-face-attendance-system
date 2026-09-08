@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     
     DEFAULT_ADMIN_EMAIL: str = "admin@weintern.com"
-    DEFAULT_ADMIN_PASSWORD: str = "admin@weintern123"
+    DEFAULT_ADMIN_PASSWORD: str = "WeInternAdminPass2026"
     DEFAULT_ADMIN_NAME: str = "System Administrator"
     
     RECOGNITION_THRESHOLD: float = 0.32
