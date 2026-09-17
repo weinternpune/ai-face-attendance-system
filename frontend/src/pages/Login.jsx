@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/client';
 import weinternLogo from '../assets/weintern-logo.png';
-import { Sparkles, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
+import { Sparkles, Lock, Mail, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('admin@weintern.com');
   const [password, setPassword] = useState('admin@weintern123');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -84,16 +85,28 @@ export default function Login() {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">Password</label>
-            <div className="relative">
+            <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:outline-none transition shadow-inner"
+                className="w-full pl-10 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:outline-none transition shadow-inner"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 p-1.5 text-slate-400 hover:text-blue-600 transition cursor-pointer rounded-lg hover:bg-slate-100"
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 

@@ -19,7 +19,10 @@ import {
   Tag, 
   Shield, 
   Briefcase,
-  Clock
+  Clock,
+  Eye,
+  EyeOff,
+  Lock
 } from 'lucide-react';
 
 export default function Enrollment() {
@@ -43,6 +46,7 @@ export default function Enrollment() {
   const [consentGiven, setConsentGiven] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const departmentOptions = [
     { label: 'AIML', value: 'AIML', desc: 'Artificial Intelligence & Machine Learning' },
@@ -68,7 +72,7 @@ export default function Enrollment() {
   ];
 
   const shiftOptions = [
-    { label: 'General Shift (09:00 - 18:00)', value: 'General Shift', desc: 'Standard 9 AM to 6 PM' },
+    { label: 'General Shift (10:00 - 19:00)', value: 'General Shift', desc: 'Standard 10 AM to 7 PM' },
     { label: 'Morning Shift (07:00 - 16:00)', value: 'Morning Shift', desc: 'Early 7 AM to 4 PM' },
     { label: 'Evening Shift (14:00 - 23:00)', value: 'Evening Shift', desc: 'Afternoon 2 PM to 11 PM' },
   ];
@@ -321,21 +325,36 @@ export default function Enrollment() {
             {/* Password Input for all roles */}
             <div className="sm:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-300">
+                <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
                   Portal Login Password
                 </label>
                 <span className="text-[11px] text-amber-400 font-medium">
                   {formData.role === 'Admin' || formData.role === 'HR' ? '* Required for Admin/HR' : 'Optional (Default: weintern@123)'}
                 </span>
               </div>
-              <input
-                type="password"
-                required={formData.role === 'Admin' || formData.role === 'HR'}
-                placeholder={formData.role === 'Admin' || formData.role === 'HR' ? 'Enter strong administrative password' : 'Enter unique password (or leave empty for weintern@123)'}
-                value={formData.password || ''}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm text-white focus:border-amber-400 focus:outline-none shadow-inner"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required={formData.role === 'Admin' || formData.role === 'HR'}
+                  placeholder={formData.role === 'Admin' || formData.role === 'HR' ? 'Enter strong administrative password' : 'Enter unique password (or leave empty for weintern@123)'}
+                  value={formData.password || ''}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full pl-4 pr-12 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm text-white focus:border-amber-400 focus:outline-none shadow-inner tracking-wide"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 p-1.5 text-slate-400 hover:text-amber-400 transition cursor-pointer rounded-lg hover:bg-slate-800/60"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
