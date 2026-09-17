@@ -42,7 +42,7 @@ async def list_shifts(current_admin: dict = Depends(get_current_admin)):
     # If no shifts in DB, initialize defaults
     if not shifts:
         defaults = [
-            {"name": "General Shift", "code": "GEN", "start_time": "09:00", "end_time": "18:00", "grace_period_minutes": 30, "late_threshold_minutes": 45, "description": "Standard 9 AM to 6 PM with 30 min grace", "is_default": True, "created_at": datetime.utcnow()},
+            {"name": "General Shift", "code": "GEN", "start_time": "10:00", "end_time": "19:00", "grace_period_minutes": 30, "late_threshold_minutes": 45, "description": "Standard 10 AM to 7 PM with 30 min grace", "is_default": True, "created_at": datetime.utcnow()},
             {"name": "Morning Shift", "code": "MOR", "start_time": "07:00", "end_time": "16:00", "grace_period_minutes": 15, "late_threshold_minutes": 30, "description": "Early morning shift 7 AM to 4 PM", "is_default": False, "created_at": datetime.utcnow()},
             {"name": "Evening Shift", "code": "EVE", "start_time": "14:00", "end_time": "23:00", "grace_period_minutes": 15, "late_threshold_minutes": 30, "description": "Afternoon to night shift", "is_default": False, "created_at": datetime.utcnow()},
         ]
