@@ -32,7 +32,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await apiClient.post('/auth/login', {
+      const res = await apiClient.post('/api/auth/login', {
         email,
         password,
       });
@@ -98,7 +98,7 @@ export default function Login() {
 
     try {
       const res = await apiClient.post(
-        '/auth/login',
+        '/api/auth/login',
         selectedCredentials
       );
 
