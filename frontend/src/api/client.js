@@ -1,16 +1,26 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || (
-  import.meta.env.PROD 
-    ? 'https://ai-face-attendance-system-bxge.onrender.com/api' 
-    : '/api'
-);
+const getBaseApiUrl = () => {
+  let url = import.meta.env.VITE_API_URL || (
+    import.meta.env.PROD 
+      ? 'https://ai-face-attendance-system-bxge.onrender.com/api' 
+      : '/api'
+  );
+  if (!url) return '/api';
+  url = url.trim().replace(/\/+$/, '');
+  if ((url.startsWith('http://') || url.startsWith('https://')) && !url.endsWith('/api')) {
+    url = `${url}/api`;
+  }
+  return url;
+};
+
+const API_BASE_URL = getBaseApiUrl();
 
 export const getWsUrl = (path = '/ws/attendance') => {
-  const url = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://ai-face-attendance-system-bxge.onrender.com/api' : '/api');
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    const wsProto = url.startsWith('https://') ? 'wss://' : 'ws://';
-    const host = url.replace(/^https?:\/\//, '').split('/')[0];
+  const base = getBaseApiUrl();
+  if (base.startsWith('http://') || base.startsWith('https://')) {
+    const wsProto = base.startsWith('https://') ? 'wss://' : 'ws://';
+    const host = base.replace(/^https?:\/\//, '').split('/')[0];
     return `${wsProto}${host}${path}`;
   }
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

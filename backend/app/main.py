@@ -131,17 +131,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount Routers
-app.include_router(auth.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
-app.include_router(attendance.router, prefix="/api")
-app.include_router(reports.router, prefix="/api")
-app.include_router(audit.router, prefix="/api")
-app.include_router(shifts.router, prefix="/api")
-app.include_router(leaves.router, prefix="/api")
-app.include_router(notifications.router, prefix="/api")
-app.include_router(geofence.router, prefix="/api")
-app.include_router(alerts.router, prefix="/api")
+# Mount Routers (both with /api and fallback root for deployment resilience)
+api_routers = [
+    auth.router,
+    users.router,
+    attendance.router,
+    reports.router,
+    audit.router,
+    shifts.router,
+    leaves.router,
+    notifications.router,
+    geofence.router,
+    alerts.router
+]
+
+for r in api_routers:
+    app.include_router(r, prefix="/api")
+    app.include_router(r)
 
 # Real-time WebSocket Endpoint
 @app.websocket("/ws/attendance")
