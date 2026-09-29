@@ -1,8 +1,9 @@
 {
-  "dependencies": {
-    "react-scripts": "^5.0.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
+  "name": "ai-face-attendance-system",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview"
   }
 }
