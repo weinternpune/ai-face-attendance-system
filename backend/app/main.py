@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
+import os
 
 from app.config import settings
 from app.database import connect_to_mongo, close_mongo_connection, get_database
