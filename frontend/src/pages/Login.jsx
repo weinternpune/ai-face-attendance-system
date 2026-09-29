@@ -52,10 +52,16 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          'Invalid email or password'
-      );
+      if (err.response?.status === 404) {
+        setError('Backend API not reachable (404). Please ensure VITE_API_URL is configured in Vercel environment variables.');
+      } else if (!err.response) {
+        setError('Network Error: Cannot connect to Backend server. Please verify your internet connection or backend status.');
+      } else {
+        setError(
+          err.response?.data?.detail ||
+            'Invalid email or password'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -124,10 +130,16 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-          'Test login failed. Please check the backend.'
-      );
+      if (err.response?.status === 404) {
+        setError('Backend API not reachable (404). Please ensure VITE_API_URL is configured in Vercel environment variables.');
+      } else if (!err.response) {
+        setError('Network Error: Cannot connect to Backend server. Please verify your internet connection or backend status.');
+      } else {
+        setError(
+          err.response?.data?.detail ||
+            'Test login failed. Please check the backend.'
+        );
+      }
     } finally {
       setLoading(false);
     }

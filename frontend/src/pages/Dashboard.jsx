@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import apiClient from '../api/client';
+import apiClient, { getWsUrl } from '../api/client';
 import CustomSelect from '../components/CustomSelect';
 import { 
   Users, 
@@ -80,8 +80,7 @@ export default function Dashboard() {
     fetchDashboardData();
 
     // Determine WS URL
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/attendance`;
+    const wsUrl = getWsUrl('/ws/attendance');
 
     let socket;
     try {

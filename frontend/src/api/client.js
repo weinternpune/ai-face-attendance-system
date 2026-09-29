@@ -1,6 +1,21 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (
+  import.meta.env.PROD 
+    ? 'https://ai-face-attendance-system-bxge.onrender.com/api' 
+    : '/api'
+);
+
+export const getWsUrl = (path = '/ws/attendance') => {
+  const url = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://ai-face-attendance-system-bxge.onrender.com/api' : '/api');
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    const wsProto = url.startsWith('https://') ? 'wss://' : 'ws://';
+    const host = url.replace(/^https?:\/\//, '').split('/')[0];
+    return `${wsProto}${host}${path}`;
+  }
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${wsProtocol}//${window.location.host}${path}`;
+};
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
