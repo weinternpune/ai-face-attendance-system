@@ -537,9 +537,16 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-slate-300 font-medium">{r.department}</td>
-                    <td className="px-5 py-4 font-mono text-white font-bold">{r.entry_time}</td>
-                    <td className="px-5 py-4 font-mono text-slate-400">{r.exit_time}</td>
+                    <td className="px-5 py-4 font-mono text-slate-400">
+                      <p className="text-white">{r.exit_time && r.exit_time !== '—' ? r.exit_time : '—'}</p>
+                      {r.working_hours > 0 ? (
+                        <p className="text-[11px] text-emerald-400 font-bold">{r.working_hours} hrs ({r.work_duration || 'Done'})</p>
+                      ) : r.exit_time && r.exit_time !== '—' ? (
+                        <p className="text-[11px] text-slate-400">{r.working_hours || 0} hrs</p>
+                      ) : (
+                        <p className="text-[10px] text-amber-400/80 font-medium">In Progress</p>
+                      )}
+                    </td>
                     <td className="px-5 py-4">
                       <span className="px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-900 border border-slate-800 text-slate-300">
                         {r.confidence ? `${r.confidence}%` : 'Manual'}

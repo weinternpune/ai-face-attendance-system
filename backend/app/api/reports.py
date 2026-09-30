@@ -5,6 +5,7 @@ import pandas as pd
 import io
 from app.database import get_database
 from app.api.auth import get_current_admin
+from app.core.timezone import get_local_now, get_today_date_str, get_current_month_str
 
 router = APIRouter(prefix="/reports", tags=["Reports & Exports"])
 
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/reports", tags=["Reports & Exports"])
 async def export_daily_csv(date: Optional[str] = None, current_admin: dict = Depends(get_current_admin)):
     """Export Daily Attendance CSV"""
     db = get_database()
-    target_date = date or datetime.now().strftime("%Y-%m-%d")
+    target_date = date or get_today_date_str()
 
     records = await db.attendance.find({"date": target_date}).to_list(length=2000)
 
@@ -84,7 +85,7 @@ async def export_range_csv(start_date: str, end_date: str, current_admin: dict =
 async def get_attendance_summary(days: int = 7, current_admin: dict = Depends(get_current_admin)):
     """7-Day Historical Daily Attendance Trend (Headcount, Late, Turnout Rate)"""
     db = get_database()
-    today = datetime.now()
+    today = get_local_now()
     start_date = (today - timedelta(days=days)).strftime("%Y-%m-%d")
 
     total_active = await db.users.count_documents({"status": "Active", "role": {"$ne": "Admin"}})
@@ -115,7 +116,7 @@ async def get_attendance_summary(days: int = 7, current_admin: dict = Depends(ge
 async def get_employee_performance(days: int = 7, current_admin: dict = Depends(get_current_admin)):
     """Weekly/Monthly attendance rate summary per employee"""
     db = get_database()
-    today = datetime.now()
+    today = get_local_now()
     start_date = (today - timedelta(days=days)).strftime("%Y-%m-%d")
 
     users = await db.users.find({"status": "Active"}).to_list(length=500)
@@ -148,7 +149,7 @@ async def get_employee_performance(days: int = 7, current_admin: dict = Depends(
 async def get_department_analytics(current_admin: dict = Depends(get_current_admin)):
     """Department-wise attendance & punctuality breakdown for today"""
     db = get_database()
-    today_date = datetime.now().strftime("%Y-%m-%d")
+    today_date = get_today_date_str()
 
     users = await db.users.find({"status": "Active", "role": {"$ne": "Admin"}}).to_list(length=1000)
     if not users:
@@ -187,7 +188,7 @@ async def get_monthly_payroll(month: Optional[str] = None, current_admin: dict =
     month format: 'YYYY-MM' (Defaults to current month)
     """
     db = get_database()
-    target_month = month or datetime.now().strftime("%Y-%m")
+    target_month = month or get_current_month_str()
 
     # Fetch active employees
     users = await db.users.find({"status": "Active", "role": {"$ne": "Admin"}}).to_list(length=1000)
@@ -274,7 +275,7 @@ async def get_monthly_payroll(month: Optional[str] = None, current_admin: dict =
 @router.get("/payroll-csv")
 async def export_payroll_csv(month: Optional[str] = None, current_admin: dict = Depends(get_current_admin)):
     """Export Monthly Payroll & Working Hours Spreadsheet (.CSV)"""
-    target_month = month or datetime.now().strftime("%Y-%m")
+    target_month = month or get_current_month_str()
     data = await get_monthly_payroll(month=target_month, current_admin=current_admin)
     employees = data.get("employees", [])
 

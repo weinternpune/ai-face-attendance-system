@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     RECOGNITION_THRESHOLD: float = 0.32
     REVIEW_THRESHOLD: float = 0.20
     OFFICE_START_TIME: str = "10:00"
+    TIMEZONE: str = "Asia/Kolkata"
 
     class Config:
         env_file = ".env"

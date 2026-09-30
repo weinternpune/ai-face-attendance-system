@@ -5,6 +5,7 @@ import logging
 from app.database import get_database
 from app.core.websocket import ws_manager
 from app.services.email_service import email_service
+from app.core.timezone import get_today_date_str
 
 logger = logging.getLogger("uvicorn")
 
@@ -14,7 +15,7 @@ class AlertService:
         Generates, logs, and dispatches an automated daily attendance summary digest for HR/Management.
         """
         db = get_database()
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = get_today_date_str()
 
         # Headcount stats
         total_employees = await db.users.count_documents({"status": "Active", "role": {"$ne": "Admin"}})

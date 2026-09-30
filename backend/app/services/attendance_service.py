@@ -1,57 +1,71 @@
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from typing import Dict, Any, Tuple, Optional
 import logging
 from app.config import settings
 from app.database import get_database
 from app.models.attendance import AttendanceStatus
 from app.core.websocket import ws_manager
+from app.core.timezone import (
+    get_system_tz, 
+    get_local_now, 
+    get_current_date_and_time, 
+    get_today_date_str, 
+    get_current_time_str
+)
 
 logger = logging.getLogger("uvicorn")
 
 class AttendanceService:
     @staticmethod
     def get_current_date_and_time() -> Tuple[str, str]:
-        now = datetime.now()
-        date_str = now.strftime("%Y-%m-%d")
-        time_str = now.strftime("%I:%M:%S %p")
-        return date_str, time_str
+        """Returns (YYYY-MM-DD, HH:MM:SS AM/PM) in configured timezone (IST)."""
+        return get_current_date_and_time()
 
-    async def calculate_shift_status(self, user: Dict[str, Any], current_dt: datetime) -> AttendanceStatus:
-        """Determines if the scan is Present or Late based on assigned or default Shift"""
+    async def calculate_shift_status(self, user: Dict[str, Any], current_dt: Optional[datetime] = None) -> AttendanceStatus:
+        """Determines if the scan is Present or Late based on assigned or default Shift in local timezone"""
+        if current_dt is None:
+            current_dt = get_local_now()
+
         db = get_database()
         shift_name = user.get("shift_name") or "General Shift"
+        shift = None
         
-        # Look up shift in DB
-        shift = await db.shifts.find_one({"name": shift_name})
-        if not shift:
-            # Check default shift
-            shift = await db.shifts.find_one({"is_default": True})
+        if db is not None:
+            try:
+                # Look up shift in DB
+                shift = await db.shifts.find_one({"name": shift_name})
+                if not shift:
+                    # Check default shift
+                    shift = await db.shifts.find_one({"is_default": True})
+            except Exception as e:
+                logger.warning(f"Error querying shift: {e}")
+
+        start_time_str = None
+        grace_mins = 15
 
         if shift and "start_time" in shift:
-            try:
-                start_parts = shift["start_time"].split(":")
-                grace_mins = int(shift.get("grace_period_minutes", 15))
-                shift_start_time = time(int(start_parts[0]), int(start_parts[1]))
-                
-                # Combine today's date with shift start
-                today = current_dt.date()
-                shift_start_dt = datetime.combine(today, shift_start_time)
-                late_cutoff_dt = shift_start_dt + timedelta(minutes=grace_mins)
+            start_time_str = shift["start_time"]
+            grace_mins = int(shift.get("grace_period_minutes", 15))
+        else:
+            start_time_str = settings.OFFICE_START_TIME
+            grace_mins = 15
 
-                if current_dt > late_cutoff_dt:
+        if start_time_str:
+            try:
+                start_parts = start_time_str.split(":")
+                shift_hour = int(start_parts[0])
+                shift_minute = int(start_parts[1]) if len(start_parts) > 1 else 0
+
+                # Compute minute offset from start of day in local time
+                current_minutes = current_dt.hour * 60 + current_dt.minute + (current_dt.second / 60.0)
+                shift_start_minutes = shift_hour * 60 + shift_minute
+                late_cutoff_minutes = shift_start_minutes + grace_mins
+
+                if current_minutes > late_cutoff_minutes:
                     return AttendanceStatus.LATE
                 return AttendanceStatus.PRESENT
             except Exception as e:
                 logger.warning(f"Error calculating shift status: {e}")
-
-        # Fallback to config OFFICE_START_TIME
-        try:
-            start_parts = settings.OFFICE_START_TIME.split(":")
-            threshold_time = time(int(start_parts[0]), int(start_parts[1]))
-            if current_dt.time() > threshold_time:
-                return AttendanceStatus.LATE
-        except Exception:
-            pass
 
         return AttendanceStatus.PRESENT
 
@@ -86,14 +100,21 @@ class AttendanceService:
         entry_dt = self.parse_time_str(entry_time_str, date_str)
         exit_dt = self.parse_time_str(exit_time_str, date_str)
         
-        if not entry_dt or not exit_dt or exit_dt <= entry_dt:
+        if not entry_dt or not exit_dt:
             return 0.0, 0.0, "Short Hours"
 
+        # If checkout crosses midnight
+        if exit_dt < entry_dt:
+            exit_dt += timedelta(days=1)
+
         total_seconds = (exit_dt - entry_dt).total_seconds()
+        if total_seconds < 0:
+            return 0.0, 0.0, "Short Hours"
+
         working_hours = round(total_seconds / 3600.0, 2)
         overtime_hours = max(0.0, round(working_hours - standard_hours, 2))
 
-        if working_hours >= standard_hours:
+        if working_hours >= (standard_hours - 0.5) or working_hours >= 7.5:
             duration_status = "Full Day"
         elif working_hours >= 4.0:
             duration_status = "Half Day"
@@ -115,12 +136,12 @@ class AttendanceService:
         punch_action: Optional[str] = "AUTO" # "AUTO", "CHECKIN", "CHECKOUT"
     ) -> Dict[str, Any]:
         """
-        Implements PRD Rules + Shift logic + Mobile Geofencing + Working Hours & Checkout
+        Implements PRD Rules + Shift logic + Mobile Geofencing + Working Hours & Checkout in IST/Local Time
         """
         db = get_database()
         user_id_str = str(user["_id"])
         today_date, current_time = self.get_current_date_and_time()
-        now_dt = datetime.now()
+        now_dt = get_local_now()
 
         # Check existing attendance for today
         existing_record = await db.attendance.find_one({
@@ -135,18 +156,39 @@ class AttendanceService:
             MIN_CHECKOUT_INTERVAL_SECONDS = 1800  # 30 minutes
 
             seconds_since_entry = 0
-            if created_at:
-                seconds_since_entry = (datetime.utcnow() - created_at).total_seconds()
-            elif entry_time:
-                entry_dt = self.parse_time_str(entry_time, today_date)
-                if entry_dt:
-                    seconds_since_entry = (now_dt - entry_dt).total_seconds()
+            entry_dt = self.parse_time_str(entry_time, today_date) if entry_time else None
+            if entry_dt:
+                # Localize entry_dt
+                tz = get_system_tz()
+                entry_dt_local = entry_dt.replace(tzinfo=tz)
+                seconds_since_entry = (now_dt - entry_dt_local).total_seconds()
+            elif created_at:
+                if created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                seconds_since_entry = (datetime.now(timezone.utc) - created_at).total_seconds()
 
             if punch_action == "CHECKOUT" or seconds_since_entry >= MIN_CHECKOUT_INTERVAL_SECONDS:
+                # Find user shift for standard hours if configured
+                standard_hours = 8.0
+                shift_name = user.get("shift_name")
+                if shift_name:
+                    shift_doc = await db.shifts.find_one({"name": shift_name})
+                    if shift_doc and "start_time" in shift_doc and "end_time" in shift_doc:
+                        try:
+                            s_parts = shift_doc["start_time"].split(":")
+                            e_parts = shift_doc["end_time"].split(":")
+                            s_h = int(s_parts[0]) + int(s_parts[1]) / 60.0
+                            e_h = int(e_parts[0]) + int(e_parts[1]) / 60.0
+                            if e_h > s_h:
+                                standard_hours = round(e_h - s_h, 1)
+                        except Exception:
+                            pass
+
                 working_hours, ot_hours, duration_status = self.calculate_work_duration(
                     entry_time, 
                     current_time, 
-                    today_date
+                    today_date,
+                    standard_hours=standard_hours
                 )
 
                 await db.attendance.update_one(
@@ -189,7 +231,7 @@ class AttendanceService:
                 return checkout_payload
 
             # Scan within 30 minutes of In-Time: Return duplicate scan notice
-            remaining_mins = max(1, round((MIN_CHECKOUT_INTERVAL_SECONDS - seconds_since_entry) / 60))
+            remaining_mins = max(1, round((MIN_CHECKOUT_INTERVAL_SECONDS - max(0, seconds_since_entry)) / 60))
             res = {
                 "status_code": "ALREADY_MARKED",
                 "message": f"Attendance already marked at {entry_time}. Exit punch available after 30 mins (in {remaining_mins}m).",
@@ -212,7 +254,7 @@ class AttendanceService:
             })
             return res
 
-        # First scan of the day: Calculate dynamic status (Present vs Late)
+        # First scan of the day: Calculate dynamic status (Present vs Late) in local timezone
         status = await self.calculate_shift_status(user, now_dt)
 
         attendance_doc = {

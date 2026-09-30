@@ -349,6 +349,9 @@ async def get_today_attendance(current_admin: dict = Depends(get_current_admin))
             "department": r.get("department"),
             "entry_time": r.get("entry_time"),
             "exit_time": r.get("exit_time", "—"),
+            "working_hours": r.get("working_hours", 0.0),
+            "overtime_hours": r.get("overtime_hours", 0.0),
+            "work_duration": r.get("work_duration", "In Progress"),
             "status": r.get("status"),
             "confidence": r.get("recognition_confidence"),
             "is_manual": r.get("is_manual_correction", False)
@@ -380,6 +383,12 @@ async def manual_correct_attendance(
     }
     if payload.entry_time:
         update_data["entry_time"] = payload.entry_time
+        exit_time = record.get("exit_time")
+        if exit_time and exit_time != "—":
+            wh, ot, wd = attendance_service.calculate_work_duration(payload.entry_time, exit_time, record.get("date", ""))
+            update_data["working_hours"] = wh
+            update_data["overtime_hours"] = ot
+            update_data["work_duration"] = wd
 
     await db.attendance.update_one({"_id": att_obj_id}, {"$set": update_data})
 
