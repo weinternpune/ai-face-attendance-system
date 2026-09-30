@@ -537,6 +537,8 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </td>
+                    <td className="px-5 py-4 text-slate-300 font-medium">{r.department || 'General'}</td>
+                    <td className="px-5 py-4 font-mono text-white font-bold">{r.entry_time}</td>
                     <td className="px-5 py-4 font-mono text-slate-400">
                       <p className="text-white">{r.exit_time && r.exit_time !== '—' ? r.exit_time : '—'}</p>
                       {r.working_hours > 0 ? (
