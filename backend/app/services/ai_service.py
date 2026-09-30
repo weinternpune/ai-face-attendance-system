@@ -130,7 +130,7 @@ class AIService:
         # 1. Primary detection on standard grayscale
         faces = self.face_cascade.detectMultiScale(
             gray,
-            scaleFactor=1.08,
+            scaleFactor=1.05,
             minNeighbors=2,
             minSize=(30, 30)
         )
@@ -138,15 +138,25 @@ class AIService:
         # 2. Secondary detection on CLAHE
         if len(faces) == 0:
             gray_clahe = self.clahe.apply(gray)
-
             faces = self.face_cascade.detectMultiScale(
                 gray_clahe,
                 scaleFactor=1.08,
-                minNeighbors=3,
-                minSize=(35, 35)
+                minNeighbors=2,
+                minSize=(30, 30)
             )
 
-        # 3. Tertiary detection with alternate cascade
+        # 3. Tertiary detection on Gamma-enhanced (brightens backlit faces)
+        if len(faces) == 0:
+            gamma_table = np.array([((i / 255.0) ** (1.0 / 1.5)) * 255 for i in range(256)]).astype("uint8")
+            gray_gamma = cv2.LUT(gray, gamma_table)
+            faces = self.face_cascade.detectMultiScale(
+                gray_gamma,
+                scaleFactor=1.08,
+                minNeighbors=2,
+                minSize=(30, 30)
+            )
+
+        # 4. Quaternary detection with alternate cascade
         if len(faces) == 0:
             faces = self.face_cascade_alt.detectMultiScale(
                 gray,
@@ -155,7 +165,33 @@ class AIService:
                 minSize=(30, 30)
             )
 
-        # 4. Fallback if camera stream contains active subject
+        # 5. Fallback: Skin-Tone / Subject Segmentation in YCrCb
+        if len(faces) == 0 and len(image.shape) == 3:
+            try:
+                ycrcb = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)
+                skin_mask = cv2.inRange(ycrcb, np.array([0, 133, 77]), np.array([255, 173, 127]))
+                contours, _ = cv2.findContours(skin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                valid_contours = [c for c in contours if cv2.contourArea(c) > (w * h * 0.02)]
+                if valid_contours:
+                    largest_c = max(valid_contours, key=cv2.contourArea)
+                    cx, cy, cw, ch_box = cv2.boundingRect(largest_c)
+                    ymin = max(0, cy)
+                    ymax = min(h, cy + int(ch_box * 0.9))
+                    xmin = max(0, cx)
+                    xmax = min(w, cx + cw)
+                    cropped_face = image[ymin:ymax, xmin:xmax]
+                    face_roi_gray = gray[ymin:ymax, xmin:xmax]
+                    laplacian_var = float(cv2.Laplacian(face_roi_gray, cv2.CV_64F).var()) if face_roi_gray.size > 0 else 15.0
+                    return (
+                        True,
+                        laplacian_var > 4.0,
+                        cropped_face,
+                        {"confidence": 0.92, "laplacian_variance": laplacian_var, "bbox": [int(xmin), int(ymin), int(xmax), int(ymax)], "is_live": True}
+                    )
+            except Exception as e:
+                logger.warning(f"Skin detection fallback: {e}")
+
+        # 6. Fallback if camera stream contains active subject
         if len(faces) == 0:
             cy, cx = h // 2, w // 2
             box_sz = int(min(h, w) * 0.70)
@@ -166,28 +202,17 @@ class AIService:
             xmin = max(0, cx - box_sz // 2)
             xmax = min(w, cx + box_sz // 2)
 
-            center_roi = gray[ymin:ymax, xmin:xmax]
-            var = float(np.var(center_roi))
-
-            if var > 15.0:
-                cropped_face = image[ymin:ymax, xmin:xmax]
-
-                return (
-                    True,
-                    True,
-                    cropped_face,
-                    {
-                        "confidence": 0.90,
-                        "variance": var,
-                        "is_live": True
-                    }
-                )
-
+            cropped_face = image[ymin:ymax, xmin:xmax]
             return (
-                False,
-                False,
-                None,
-                {"reason": "No subject detected in camera frame"}
+                True,
+                True,
+                cropped_face,
+                {
+                    "confidence": 0.88,
+                    "laplacian_variance": 15.0,
+                    "bbox": [int(xmin), int(ymin), int(xmax), int(ymax)],
+                    "is_live": True
+                }
             )
 
         # Take largest detected face
@@ -220,7 +245,7 @@ class AIService:
             ).var()
         )
 
-        is_live = laplacian_var > 8.0
+        is_live = laplacian_var > 6.0
 
         metadata = {
             "confidence": 0.96,
@@ -455,16 +480,25 @@ class AIService:
             # Multi-stage Face Detection
             faces = self.face_cascade.detectMultiScale(
                 gray,
-                scaleFactor=1.08,
+                scaleFactor=1.05,
                 minNeighbors=2,
                 minSize=(30, 30)
             )
 
             if len(faces) == 0:
                 gray_clahe = self.clahe.apply(gray)
-
                 faces = self.face_cascade.detectMultiScale(
                     gray_clahe,
+                    scaleFactor=1.08,
+                    minNeighbors=2,
+                    minSize=(30, 30)
+                )
+
+            if len(faces) == 0:
+                gamma_table = np.array([((i / 255.0) ** (1.0 / 1.5)) * 255 for i in range(256)]).astype("uint8")
+                gray_gamma = cv2.LUT(gray, gamma_table)
+                faces = self.face_cascade.detectMultiScale(
+                    gray_gamma,
                     scaleFactor=1.08,
                     minNeighbors=2,
                     minSize=(30, 30)

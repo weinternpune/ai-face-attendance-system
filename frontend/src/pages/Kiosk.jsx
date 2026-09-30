@@ -182,10 +182,10 @@ export default function Kiosk() {
     }, delay);
   };
 
-  const handleFrameCapture = async (base64Image) => {
-    if (isProcessing || scanState !== 'STANDBY') return;
+  const handleFrameCapture = async (base64Image, force = false) => {
+    if ((isProcessing && !force) || scanState !== 'STANDBY') return;
     setIsProcessing(true);
-    setLastApiStatus(activeChallengeMode ? `Checking active challenge: ${activeChallenge.title}...` : 'Analyzing facial features...');
+    setLastApiStatus(activeChallengeMode ? `Checking challenge: ${activeChallenge.title}...` : 'Analyzing facial features...');
 
     try {
       let response;
@@ -207,7 +207,7 @@ export default function Kiosk() {
       setLastApiStatus(res.message || res.status_code);
 
       if (res.status_code === 'CHALLENGE_FAILED') {
-        setIsProcessing(false);
+        setTimeout(() => setIsProcessing(false), 1000);
         return;
       }
 
@@ -267,13 +267,17 @@ export default function Kiosk() {
         case 'NO_FACE':
         case 'EMBEDDING_FAILED':
         default:
-          setIsProcessing(false);
+          setTimeout(() => {
+            setIsProcessing(false);
+          }, 1200);
           break;
       }
     } catch (err) {
       console.error('Kiosk verification error:', err);
-      setLastApiStatus('API connection error');
-      setIsProcessing(false);
+      setLastApiStatus(err.response?.data?.detail || 'Server connecting... Please look directly at camera');
+      setTimeout(() => {
+        setIsProcessing(false);
+      }, 1500);
     }
   };
 
@@ -409,19 +413,20 @@ export default function Kiosk() {
             <CameraFeed 
               onFrameCapture={handleFrameCapture} 
               isScanning={scanState === 'STANDBY'} 
-              captureIntervalMs={1000}
+              captureIntervalMs={2000}
               scanState={scanState}
             />
           </div>
           
           <div className="flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-3 px-2">
             <div className="flex items-center gap-2 bg-slate-950/80 px-3.5 py-2 rounded-2xl border border-slate-800 shadow-inner">
-              <Activity className="w-4 h-4 text-amber-400 animate-pulse" />
+              <Activity className={`w-4 h-4 ${isProcessing ? 'text-amber-400 animate-spin' : 'text-emerald-400'}`} />
               <span>Diagnostic: <strong className="text-white">{lastApiStatus}</strong></span>
             </div>
             
             <button
               type="button"
+              disabled={isProcessing}
               onClick={() => {
                 const canvas = document.querySelector('canvas');
                 const video = document.querySelector('video');
@@ -431,12 +436,12 @@ export default function Kiosk() {
                   const ctx = canvas.getContext('2d');
                   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                   const frame = canvas.toDataURL('image/jpeg', 0.85);
-                  handleFrameCapture(frame);
+                  handleFrameCapture(frame, true);
                 }
               }}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 font-bold text-xs rounded-xl border border-slate-700 shadow-md transition hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-xs rounded-xl shadow-md transition hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Scan className="w-3.5 h-3.5" /> Scan Face Now
+              <Scan className="w-3.5 h-3.5" /> {isProcessing ? 'Scanning...' : 'Scan Face Now'}
             </button>
           </div>
         </div>
